@@ -36,6 +36,7 @@
 import asyncio
 import zipfile
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
@@ -51,7 +52,12 @@ from app.services.tmall_pipeline import SamplingParams, ingest_archive
 
 # 独立的 schema，跑完就删。用 schema 而不是 public，是为了保证
 # 「测试会不会碰到真实数据」这个问题永远只有一个答案：不会。
-SCHEMA = "tmall_itest"
+#
+# 名字每次运行都不同（进程启动时随机一次）。固定名字有两个问题：
+#   1. 两个 pytest 进程并行跑时，会互相 DROP 掉对方正在用的 schema；
+#   2. 上一次跑崩在中间留下的 schema 会被这一次静默复用，
+#      里面的陈年数据会被当成本次的前置条件，失败原因因此变得极难判断。
+SCHEMA = f"tmall_itest_{uuid4().hex[:8]}"
 
 SILVER_TABLE_NAMES = ("tmall_users", "tmall_user_events", "tmall_repurchase_samples")
 GOLD_TABLE_NAMES = tuple(name for name, _ in GOLD_TABLES)
@@ -109,6 +115,14 @@ requires_database = pytest.mark.skipif(
     reason="需要可用的 PostgreSQL；未连上时跳过（本文件验证的是真实事务语义）",
 )
 
+# 整个文件都依赖真数据库，所以用模块级 pytestmark 一次性打上，而不是逐个函数加装饰器。
+#
+# 这不是风格偏好：此前 13 个用例里有 7 个漏了 @requires_database，
+# 后果是「没有 PostgreSQL 的机器上不是跳过、而是失败」——
+# 正好和本文件开头承诺的「数据库不可用时整个文件会跳过」相反。
+# 模块级标记没有「新加一个测试忘了写装饰器」这个失效方式。
+pytestmark = requires_database
+
 
 def _make_engine() -> AsyncEngine:
     """测试引擎：每条连接都把 search_path 指到测试 schema。
@@ -118,13 +132,32 @@ def _make_engine() -> AsyncEngine:
     开出来的每个事务都会落在测试 schema 里——包括清空、COPY、Gold 刷新
     和台账写入，它们各自可能用不同的连接。
 
+    --- search_path 里**绝对不能带 public** ---
+
+    这条曾经是 `f"{SCHEMA}, public"`，看起来更保险（找不到就去 public 兜底），
+    实际是这套测试此前失效的根因：
+
+        _create_schema() 用 Base.metadata.create_all() 建表，而 create_all
+        会先对每张表调 has_table() 做存在性检查。search_path 里有 public 时，
+        只要 public.tmall_users 已经存在（迁移过的库就是这种情况），
+        has_table() 就返回 True —— create_all 于是认为「这张表已经有了」，
+        跳过创建。结果是测试 schema 里**一张表都没建**。
+
+        接着 _seed_old_data() 和导入流水线的 INSERT 全是不带 schema 限定的，
+        它们顺着 search_path 落到了 **public** —— 也就是真实数据上。
+        表现为主键冲突（user_id=99 已存在），或者更糟：静默改写真实表。
+
+    去掉 public 之后，has_table() 只看得到测试 schema，建表正常发生，
+    之后所有读写也都留在测试 schema 内。测试是否安全不再取决于
+    「目标库的 public 恰好是空的」，而是无条件成立。
+
     NullPool 是刻意的：一次失败之后连接可能处在不干净的状态，
     复用会让下一个测试的失败原因变得含糊。
     """
     return create_async_engine(
         _database_url(),
         poolclass=NullPool,
-        connect_args={"server_settings": {"search_path": f"{SCHEMA}, public"}},
+        connect_args={"server_settings": {"search_path": SCHEMA}},
     )
 
 
@@ -574,7 +607,6 @@ def _gold_semantics(tmp_path, monkeypatch) -> dict:
     return scenario.gold
 
 
-@requires_database
 def test_repeat_buy_means_same_merchant_not_breadth(tmp_path, monkeypatch):
     """复购 = 在同一商家买过 ≥2 次；购买广度 = 在 ≥2 个不同商家买过。
 
@@ -597,7 +629,6 @@ def test_repeat_buy_means_same_merchant_not_breadth(tmp_path, monkeypatch):
     assert by_user[10].buy_merchant_count == 2
 
 
-@requires_database
 def test_multi_merchant_buy_flag_is_equivalent_to_the_merchant_count(tmp_path, monkeypatch):
     """广度标志必须恒等于 buy_merchant_count >= 2。
 
@@ -609,7 +640,6 @@ def test_multi_merchant_buy_flag_is_equivalent_to_the_merchant_count(tmp_path, m
         assert row.multi_merchant_buy_flag == (row.buy_merchant_count >= 2)
 
 
-@requires_database
 def test_merchant_repeat_buy_user_count_and_rate(tmp_path, monkeypatch):
     """商家维度的复购用户数与复购率。
 
@@ -636,7 +666,6 @@ def test_merchant_repeat_buy_user_count_and_rate(tmp_path, monkeypatch):
         assert row.repeat_buy_user_count <= row.buy_user_count
 
 
-@requires_database
 def test_positive_rate_is_identical_on_both_train_rows(tmp_path, monkeypatch):
     """正样本占比是整个 train 集的属性，两行必须存同一个数。
 
@@ -655,7 +684,6 @@ def test_positive_rate_is_identical_on_both_train_rows(tmp_path, monkeypatch):
     assert rates == {0.5}, f"train 两行的正样本占比不一致或不为 0.5：{rates}"
 
 
-@requires_database
 def test_positive_rate_is_never_zero_on_the_negative_row(tmp_path, monkeypatch):
     """把「唯一能取到的那一行」当成答案，也必须得到 0.5。
 
@@ -671,7 +699,6 @@ def test_positive_rate_is_never_zero_on_the_negative_row(tmp_path, monkeypatch):
         )
 
 
-@requires_database
 def test_unlabeled_test_row_has_no_positive_rate_and_no_probability(tmp_path, monkeypatch):
     """test 集没有标签：正样本占比与平均概率都必须是 NULL，不是 0。
 

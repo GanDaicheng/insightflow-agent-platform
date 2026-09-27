@@ -3,6 +3,18 @@ from types import SimpleNamespace
 
 import pytest
 
+# 用 __file__ 定位源码，不要写 Path("backend/app/...")。
+# 后者只有在「当前工作目录恰好是项目根目录」时才成立——从 backend/ 里跑
+# pytest 会直接 FileNotFoundError，而项目此前并没有任何配置去纠正 cwd。
+# 基于 __file__ 的路径与工作目录无关，从哪里跑都对。
+TOOLS_SOURCE = (
+    Path(__file__).resolve().parents[1]
+    / "app"
+    / "agent"
+    / "business_analysis"
+    / "tools.py"
+)
+
 
 @pytest.mark.anyio
 async def test_analyze_business_data_calls_existing_graph(monkeypatch):
@@ -38,9 +50,7 @@ async def test_analyze_business_data_calls_existing_graph(monkeypatch):
 
 
 def test_business_analysis_tools_do_not_import_database_drivers():
-    source = Path("backend/app/agent/business_analysis/tools.py").read_text(
-        encoding="utf-8"
-    )
+    source = TOOLS_SOURCE.read_text(encoding="utf-8")
 
     assert "sqlalchemy" not in source
     assert "asyncpg" not in source

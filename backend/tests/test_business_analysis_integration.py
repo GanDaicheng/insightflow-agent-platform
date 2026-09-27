@@ -10,6 +10,13 @@ from app.agent.business_analysis.schemas import BusinessAnalysisRequest
 from app.agent.business_analysis.tools import search_business_knowledge
 from app.services.business_analysis_runner import run_business_analysis
 
+# 用 __file__ 定位测试夹具，不要写 Path("backend/tests/...")。
+# 后者依赖「当前工作目录是项目根目录」，从 backend/ 里跑就会 FileNotFoundError。
+# 基于 __file__ 的路径与 cwd 无关。
+CASES_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "business_analysis_cases.json"
+)
+
 
 class FakeConnection:
     async def execute(self, *_args, **_kwargs):
@@ -92,7 +99,7 @@ def test_public_event_drops_unknown_fields_and_sql():
 
 
 def test_evaluation_fixture_contains_three_business_cases():
-    fixture = Path("backend/tests/fixtures/business_analysis_cases.json")
+    fixture = CASES_FIXTURE
     assert fixture.exists()
     text = fixture.read_text(encoding="utf-8")
     assert "trend-drilldown" in text
