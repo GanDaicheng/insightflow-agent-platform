@@ -437,6 +437,7 @@ docker-compose.yml      PostgreSQL、FastAPI、Next.js 编排，以及一次性 
 
 ## 详细文档
 
+- [系统架构图与链路说明](docs/architecture.md)
 - [天猫数据接入运行手册](docs/tmall-data-pipeline-runbook.md)
 - [天猫数据接入面试讲解](docs/tmall-data-pipeline-interview.md)
 - [天猫数据与可询问问题清单](docs/天猫数据导入与可询问问题清单.docx)
