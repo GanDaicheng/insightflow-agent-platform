@@ -181,10 +181,17 @@ services:
       # 宿主机 8000 -> 容器 8000
       - "8000:8000"
     healthcheck:
-      # 在容器内部请求自己的健康接口，只有接口返回 200 才算健康。
-      # 探活的是 /api/v1/health 而不是 /docs：前者会真的去 ping 数据库，
-      # 数据库断了它就返回 503，这个容器才会被判成不健康。
-      test: ["CMD", "python", "-c", "from urllib.request import urlopen; response = urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3); assert response.status == 200"]
+      # 探的是 **readiness**（/api/v1/readiness），不是 liveness（/api/v1/health）。
+      #
+      # 为什么必须用 readiness：health 只证明「进程活着、数据库连得上」，
+      # 而空库上 SELECT 1 照样成功——一个连表都没有的实例会被判成健康，
+      # 前端随之启动，然后每个请求都失败。
+      # readiness 会额外确认迁移已到 head、必需的表都在、当前模式所需的配置齐备，
+      # 未就绪时返回 503，这个容器就不会被当成可用。
+      #
+      # 代价是：没跑过初始化（init 服务 / scripts/bootstrap.ps1）的库上，
+      # 后端会一直不健康，frontend 也起不来。这是刻意的——比绿灯装死好。
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; response = urlopen('http://127.0.0.1:8000/api/v1/readiness', timeout=5); assert response.status == 200"]
       interval: 10s
       timeout: 5s
       retries: 6

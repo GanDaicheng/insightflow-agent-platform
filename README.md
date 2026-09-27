@@ -213,34 +213,185 @@ Markdown / TXT / DOCX / PDF
 
 ## 快速启动
 
+### 环境要求
+
+| 项 | 要求 | 说明 |
+| --- | --- | --- |
+| Docker Desktop | 已安装并**已启动** | 后端、前端、数据库全部跑在容器里，本机不需要装 Python 或 Node |
+| PowerShell | Windows PowerShell 5.1 或更高 | 启动脚本是 `.ps1` |
+| 可用端口 | `3000`、`8000`、`5432` | 被占用时容器起不来，见「常见问题」 |
+
+不需要预先安装 Python、Node、PostgreSQL —— 所有依赖都在镜像里。
+
+### 方式一：Demo 模式（推荐首次体验，不需要任何 API Key）
+
 ```powershell
-# 1. 创建本地配置并填写模型相关 API Key
+# 1. 创建配置
 Copy-Item .env.example .env
 
-# 2. 启动 PostgreSQL、后端和前端
-docker compose up --build -d
-docker compose ps
+# 2. 把 APP_MODE 改成 demo（用记事本或 VS Code 打开 .env，改这一行即可）
+#    APP_MODE=demo
 
-# 3. 初始化数据库和知识库
-cd backend
-python -m alembic upgrade head
-python scripts/seed_retail_data.py
-python scripts/ingest_knowledge.py
+# 3. 一键启动：数据库 -> 初始化 -> 后端 -> 前端
+.\scripts\bootstrap.ps1 -AppMode demo
 ```
 
-访问地址：
+启动完成后脚本会打印前端地址（默认 http://localhost:3000）和常用日志命令。
 
-- Agent 工作台：http://localhost:3000
-- FastAPI 文档：http://localhost:8000/docs
-- 健康检查：http://localhost:8000/api/v1/health
+Demo 模式下**不调用任何外部模型**，全部使用内置样例数据与确定性替身，
+页面上会有一条醒目的 Demo 标识，结果可重复。它只支持固定的几个演示问题，
+页面上会列出可问的清单；问其它问题会得到一段明确的提示，而不是偷偷去调真实模型。
 
-导入天猫数据：
+### 方式二：Real 模式（真实模型）
 
 ```powershell
-python scripts/ingest_tmall_data.py --zip "<data_format1.zip 路径>" --dry-run
+Copy-Item .env.example .env
+# 编辑 .env，填入模型相关的 Key，保持 APP_MODE=real（或不写这一行，缺省就是 real）
+.\scripts\bootstrap.ps1
+```
+
+Real 模式下需要配置：
+
+| 变量 | 用途 | 缺了会怎样 |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | 意图识别、SQL 生成、结论解释、经营分析 | **后端判定为未就绪**，不会启动成功 |
+| `EMBEDDING_API_KEY` | 知识文档向量化与检索 | 知识问答不可用；问数与经营分析不受影响 |
+| `RERANK_API_KEY` + `RERANK_BASE_URL` | 检索结果精排 | 精排自动跳过，问答退回 RRF 顺序 |
+
+**密钥一律填在 `.env` 里，绝不写进 `.env.example` 或任何提交进 Git 的文件。**
+`.env` 已被 `.gitignore` 忽略；`.env.example` 只放结构说明，不放真实值。
+
+### 一键启动脚本做了什么
+
+`scripts/bootstrap.ps1` 显式控制启动顺序，不依赖 Compose 的隐式行为：
+
+```
+1. 检查 Docker 是否可用
+2. 检查项目根目录是否存在 .env（不会替你创建、也不会覆盖已有内容）
+3. 启动 PostgreSQL，等它 healthy
+4. 跑 init 服务：数据库迁移 -> 零售种子数据 -> 知识库文档，等它退出码为 0
+5. 启动 backend 和 frontend
+6. 等 backend readiness（不是"进程活着"，见下文）
+7. 等 frontend healthy
+8. 打印访问地址与常用日志命令
+```
+
+任何一步失败都会立刻停下并返回非零退出码，不会留下一个"看起来起来了"的半成品。
+
+### 数据初始化说明
+
+初始化由 `backend/scripts/initialize_demo.py` 完成，四步：
+
+| 步骤 | 内容 | 幂等机制 |
+| --- | --- | --- |
+| 1 | 等待数据库可用 | — |
+| 2 | Alembic 迁移到 head | 按 `alembic_version` 表判断 |
+| 3 | 零售种子数据（区域/客户/商品/日期/订单） | `ON CONFLICT DO NOTHING` |
+| 4 | 知识库种子文档（`backend/knowledge_seed/`） | 内容 hash 未变则整篇跳过 |
+
+**重复执行是安全的**：已存在的零售数据不会重复插入，未变化的知识切片不会重算向量。
+
+知识库这一步由 `INIT_KNOWLEDGE_MODE` 控制：
+
+| 取值 | 行为 |
+| --- | --- |
+| `auto`（缺省） | 配了 embedding 就导入；没配就跳过并给出醒目提示，**退出码仍为 0** |
+| `skip` | 明确跳过 |
+| `required` | 缺配置或导入失败都返回非零退出码 |
+
+### 导入天猫原始数据（可选，需要自备数据文件）
+
+天猫 IJCAI 2015 原始数据**不包含在仓库里**，需要自行下载。初始化流程**不会**碰它。
+拿到 zip 之后按运行手册操作：
+
+```powershell
+cd backend
+python scripts/ingest_tmall_data.py --zip "<data_format1.zip 路径>" --dry-run   # 先看会做什么
 python scripts/ingest_tmall_data.py --zip "<data_format1.zip 路径>" --sample-modulus 55 --sample-residue 0
 python scripts/verify_tmall_data.py
 ```
+
+完整参数与校验说明见 [天猫数据接入运行手册](docs/tmall-data-pipeline-runbook.md)。
+
+### 查看服务状态与日志
+
+```powershell
+docker compose ps                    # 三个服务的状态（容器健康 ≠ 业务就绪，见下文）
+docker compose logs -f backend       # 跟踪后端日志
+docker compose logs -f frontend      # 跟踪前端日志
+docker compose logs -f postgres      # 跟踪数据库日志
+```
+
+`docker compose ps` 里 backend 显示 `healthy` 表示**业务就绪**（迁移已跑完、表齐全、
+当前模式所需配置齐备），而不是仅仅"进程活着"。
+
+### 停止服务
+
+```powershell
+docker compose down                  # 停止并删除容器，**数据保留**
+```
+
+> **不要加 `-v`。** `docker compose down -v` 会连数据卷一起删除，
+> 数据库里的业务数据、知识库切片和 Agent 状态全部丢失，且无法恢复。
+
+### 重置数据
+
+```powershell
+# 软重置：重新跑一遍初始化。已存在的种子数据不会重复插入，安全且快。
+docker compose --profile init run --rm init
+```
+
+要**彻底清空重来**（会丢失全部数据，请先确认不需要保留）：
+
+```powershell
+docker compose down -v      # 危险：连同数据卷一起删除
+.\scripts\bootstrap.ps1 -AppMode demo
+```
+
+### 健康检查与就绪检查
+
+两个接口回答的是不同的问题，**不要混用**：
+
+| 接口 | 回答的问题 | 用途 |
+| --- | --- | --- |
+| `GET /api/v1/health` | 进程活着吗？数据库连得上吗？ | 人看的存活检查。数据库连接正常就返回 200 |
+| `GET /api/v1/readiness` | **现在能不能真的提供服务？** | **容器的 healthcheck 用的是这个** |
+
+区别的关键在「空库」这一种状态：`SELECT 1` 在空库上照样成功，
+所以只看 health 的话，一个连表都没有的实例会被判成健康，请求打过去全部失败。
+readiness 会额外确认：
+
+1. 数据库连接可用
+2. Alembic 已迁移到当前 head
+3. 必需的业务表都存在
+4. 当前模式所需的配置齐备（real 模式要求 `OPENAI_API_KEY`；demo 模式不要求）
+5. 知识库满足当前模式的要求（demo 不依赖向量库；real 在配置了 embedding 时要求非空）
+
+未就绪返回 **HTTP 503**，就绪返回 200，响应体里逐项列出检查结果。
+因为容器的 healthcheck 用的是 readiness，**没跑过初始化的库上后端会一直不健康，
+前端也不会启动** —— 这是刻意的，比"绿灯装死"好。
+
+### 常见问题
+
+| 现象 | 原因与处理 |
+| --- | --- |
+| 脚本提示「找不到 .env」 | 先执行 `Copy-Item .env.example .env`。脚本不会替你创建，避免覆盖你自己的密钥 |
+| 脚本提示「Docker 守护进程没有响应」 | Docker Desktop 还没启动完，等它就绪后重试 |
+| 后端一直 `unhealthy` | 多半是没跑初始化。执行 `docker compose --profile init run --rm init`，再看 `docker compose logs backend` |
+| 后端报 `APP_MODE 只能是 real 或 demo` | `.env` 里 `APP_MODE` 拼错了。改成 `real` 或 `demo`，不要留空值以外的其它内容 |
+| real 模式下后端不就绪 | 缺 `OPENAI_API_KEY`。看 `/api/v1/readiness` 的返回体，它会点名缺哪一项 |
+| 初始化报 `AuthenticationError` | `.env` 里的 Key 无效或过期。注意**不要填占位符**，留空表示未配置 |
+| 端口被占用 | 3000/8000/5432 已被别的程序占用，先停掉它，或改 `docker-compose.yml` 里的端口映射 |
+| 前端页面样式丢失 | 前端镜像构建不完整，重新执行 `docker compose build frontend` |
+
+### 当前限制
+
+- 使用公开数据和本地样例数据，不是企业生产系统。
+- 尚未接入企业统一身份认证、租户隔离和细粒度数据权限。
+- Demo 模式只覆盖固定的演示问题；未收录的问题会返回结构化提示，不会调用真实模型。
+- 外部模型、Embedding 和精排需要自行配置 API Key，并可能产生调用费用。
+- 天猫原始数据需要自行下载，仓库内不包含。
+- 停止服务只能用 `docker compose down`，**不要用 `-v`**。
 
 ## 主要接口
 
@@ -251,6 +402,9 @@ python scripts/verify_tmall_data.py
 | `POST /api/v1/rag/answer` | RAG 知识问答 |
 | `POST /api/v1/rag/documents` | 上传、切片和向量化知识文档 |
 | 经营分析接口 | 多步骤 Agent 分析、SSE 过程和报告生成 |
+| `GET /api/v1/health` | 存活检查：进程活着、数据库连得上 |
+| `GET /api/v1/readiness` | 就绪检查：迁移、表、配置是否齐备。未就绪返回 503 |
+| `GET /api/v1/runtime` | 当前运行模式（real / demo），前端据此显示 Demo 标识 |
 
 ## 项目结构
 
@@ -258,15 +412,19 @@ python scripts/verify_tmall_data.py
 backend/
   app/agent/            LangGraph 问数流程与 Deep Agents 经营分析
   app/api/              HTTP 与流式接口
-  app/services/         RAG、安全查询、数据导入和业务服务
+  app/services/         RAG、安全查询、数据导入、就绪检查等业务服务
   app/models/           业务数据、知识库与 Agent 状态模型
+  app/demo/             APP_MODE=demo 的全部实现（问数/知识/经营分析三种替身）
   knowledge_seed/       零售与天猫业务知识
-  scripts/              导入、验证和冒烟脚本
+  scripts/              初始化入口、导入、验证和冒烟脚本
   tests/                后端自动化测试
 frontend/
   src/app/              Next.js 路由
+  src/components/       界面组件（含 Demo 模式标识条）
   src/features/         Agent、平台和架构功能
-docker-compose.yml      PostgreSQL、FastAPI、Next.js 编排
+scripts/
+  bootstrap.ps1         一键启动：数据库 → 初始化 → 后端 → 前端
+docker-compose.yml      PostgreSQL、FastAPI、Next.js 编排，以及一次性 init 服务
 ```
 
 ## 面试讲解重点

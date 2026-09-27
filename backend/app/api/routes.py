@@ -49,6 +49,7 @@ from app.services.knowledge_search import (
     KnowledgeSearchError,
 )
 from app.services.rag_answer import answer_from_knowledge
+from app.services.readiness import check_readiness
 from app.services.safe_query import (
     MAX_SQL_LENGTH,
     DatabaseUnavailableError,
@@ -108,6 +109,32 @@ class RuntimeModeResponse(BaseModel):
     app_mode: Literal["real", "demo"]
     demo: bool
     supported_questions: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class ReadinessCheckResponse(BaseModel):
+    """一项就绪检查的结果。
+
+    detail 是受控说明，只讲「缺什么、该怎么办」，绝不回显配置值、
+    SQL 原文或异常堆栈。未就绪时它是最有用的一栏，所以照样返回。
+    """
+
+    name: str
+    ok: bool
+    detail: str | None = None
+
+
+class ReadinessResponse(BaseModel):
+    """就绪检查的对外结果。
+
+    与 /api/v1/health 的分工见 app/services/readiness.py 的模块说明：
+    health 回答「进程活着吗」，readiness 回答「现在能不能真的提供服务」。
+
+    关键是「空库」这一种状态——空库上 SELECT 1 照样成功，
+    所以只看 health 的调用方会把一个连表都没有的实例当成可用。
+    """
+
+    status: Literal["ready", "not_ready"]
+    checks: list[ReadinessCheckResponse]
 
 
 class SafeQueryRequest(BaseModel):
@@ -349,6 +376,34 @@ async def runtime_mode() -> RuntimeModeResponse:
         supported = supported_questions()
 
     return RuntimeModeResponse(app_mode=app_mode, demo=demo, supported_questions=supported)
+
+
+@router.get(
+    "/api/v1/readiness",
+    response_model=ReadinessResponse,
+    response_model_exclude_none=True,
+    responses={503: {"description": "尚未就绪（迁移未完成、缺表或缺少当前模式所需的配置）。"}},
+)
+async def readiness(response: Response) -> ReadinessResponse:
+    """就绪检查。未就绪返回 503，就绪返回 200。
+
+    503 是**刻意的**语义：这是「本实例暂时不能服务」，不是「本服务写错了」。
+    编排层和负载均衡都按这个约定把流量从这个实例上摘掉。
+
+    检查逻辑全在 app/services/readiness.py，本函数只负责把结果翻译成 HTTP。
+    """
+    result = await check_readiness()
+
+    if not result.ready:
+        response.status_code = 503
+
+    return ReadinessResponse(
+        status="ready" if result.ready else "not_ready",
+        checks=[
+            ReadinessCheckResponse(name=c.name, ok=c.ok, detail=c.detail)
+            for c in result.checks
+        ],
+    )
 
 
 @router.post("/chat", response_model=ChatResponse)

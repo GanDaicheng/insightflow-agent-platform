@@ -218,4 +218,7 @@ def test_openapi_still_lists_every_endpoint():
         # 单独开接口而不是往 /health 或 / 上加字段——那两个的响应结构
         # 已被各自的测试逐字段钉住，而且各有明确职责。
         "/api/v1/runtime",
+        # 复刻验收阶段新增：就绪检查。容器的 healthcheck 探的是它，
+        # 因为 /api/v1/health 只做 SELECT 1，空库也会被判成健康。
+        "/api/v1/readiness",
     }
