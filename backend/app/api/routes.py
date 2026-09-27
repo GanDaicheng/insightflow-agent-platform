@@ -24,7 +24,9 @@ from app.agent.data_query.constants import (
 )
 from app.agent.data_query.graph import get_data_query_graph
 from app.agent.graph import run_agent
+from app.core.config import APP_MODE_DEMO, get_settings, is_demo_mode
 from app.core.exceptions import ConfigurationError
+from app.demo.data_query import get_demo_data_query_graph
 from app.services.database_health import check_database
 from app.services.document_normalization import (
     EmptyDocumentError,
@@ -90,6 +92,22 @@ class ApplicationHealthResponse(DatabaseHealthResponse):
     """
 
     service: Literal["backend"] = "backend"
+
+
+class RuntimeModeResponse(BaseModel):
+    """当前运行模式。
+
+    单独开一个接口，而不是往 /api/v1/health 或 / 上加字段，有两个原因：
+    那两个响应已经被测试逐字段钉死（多了字段就红），而且它们各有明确职责
+    （探活、服务说明）。「当前是不是 demo」是新的一件事，给它自己的入口更清楚。
+
+    supported_questions 只在 demo 模式下有内容：真实模式没有「收录哪些问题」
+    这个概念，返回空字典而不是硬凑一份清单。
+    """
+
+    app_mode: Literal["real", "demo"]
+    demo: bool
+    supported_questions: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class SafeQueryRequest(BaseModel):
@@ -310,6 +328,27 @@ def index() -> dict[str, str]:
         "docs": "/docs",
         "health": "/api/v1/health",
     }
+
+
+@router.get("/api/v1/runtime", response_model=RuntimeModeResponse)
+async def runtime_mode() -> RuntimeModeResponse:
+    """当前运行模式。前端用它决定要不要显示 Demo 横幅、以及列出可问的问题。
+
+    这个接口**只读配置**：不碰数据库、不碰模型，所以在 demo 和 real 下行为一致，
+    也不会成为新的故障点。
+    """
+    app_mode = get_settings().app_mode
+    demo = app_mode == APP_MODE_DEMO
+
+    supported: dict[str, list[str]] = {}
+    if demo:
+        # 放在函数内导入：路由模块顶层只该依赖 Agent/服务的公开入口，
+        # demo 包是装配期的东西，不该成为路由的常驻依赖。
+        from app.demo.scenarios import supported_questions
+
+        supported = supported_questions()
+
+    return RuntimeModeResponse(app_mode=app_mode, demo=demo, supported_questions=supported)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -582,7 +621,15 @@ async def agent_data_query(req: AgentDataQueryRequest) -> AgentDataQueryResponse
     服务端日志也只记异常类型。
     """
     try:
-        graph = get_data_query_graph()
+        # demo 模式换一套确定性替身：不调模型、不读真库。
+        #
+        # 这个判断放在**装配层**而不是 graph.py 里，是被架构约束逼出来的：
+        # data_query 这个 Agent 包被禁止 import app.core.config
+        # （test_agent_never_imports_database_drivers_or_repositories 守着），
+        # 而判断模式必须读配置。配置本来就该在装配层解析完再往下传。
+        graph = (
+            get_demo_data_query_graph() if is_demo_mode() else get_data_query_graph()
+        )
         state = await graph.ainvoke({"question": req.question})
     except Exception as exc:  # noqa: BLE001
         # 只记异常类名。异常原文里可能带着连接串、SQL 片段甚至密钥；

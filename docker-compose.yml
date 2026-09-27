@@ -122,6 +122,10 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
+      # 运行模式。real（缺省）走真实的模型与检索链路；demo 把模型、embedding、
+      # 精排全部换成确定性替身，一把 Key 都不需要。
+      # **缺省值是 real**：这个变量是后加的，缺省必须让没配过它的环境行为完全不变。
+      APP_MODE: ${APP_MODE:-real}
       # 模型配置透传给容器。值来自根目录 .env，本文件只给缺省值。
       # 留空也行：健康检查不碰模型，缺 key 不影响后端起不来。
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

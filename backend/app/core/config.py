@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.exceptions import ConfigurationError
@@ -44,6 +45,16 @@ DEFAULT_RERANK_TIMEOUT_SECONDS = 10.0
 # 校验逻辑和报错文案自动跟上。
 DEFAULT_RERANK_PROVIDER = "dashscope"
 SUPPORTED_RERANK_PROVIDERS = (DEFAULT_RERANK_PROVIDER,)
+
+# --- 运行模式 -------------------------------------------------------------
+# real：真实的 LangGraph / Deep Agents / LLM / Embedding / Reranker / RAG。
+# demo：全部换成确定性替身，不发起任何外部调用，不需要任何 API Key。
+#
+# 缺省 real 是刻意的：本变量是在项目已经跑起来之后才加的，
+# 缺省值必须让**没配过它的老环境行为完全不变**。
+APP_MODE_REAL = "real"
+APP_MODE_DEMO = "demo"
+SUPPORTED_APP_MODES = (APP_MODE_REAL, APP_MODE_DEMO)
 
 
 @dataclass(frozen=True)
@@ -104,6 +115,11 @@ class Settings(BaseSettings):
     model_name: str = "deepseek-chat"
     temperature: float = 0.0
 
+    # 运行模式。缺省 real，保证没配过它的老环境行为完全不变。
+    # 校验故意放在**构造时**而不是第一次用到的时刻：配错值应该在启动阶段就炸，
+    # 而不是等到某个请求打进来才失败——那时候排查成本高得多。
+    app_mode: str = APP_MODE_REAL
+
     database_url: str = ""
 
     embedding_provider: str = DEFAULT_EMBEDDING_PROVIDER
@@ -134,6 +150,25 @@ class Settings(BaseSettings):
     business_analysis_max_tool_calls: int = 24
     business_analysis_run_timeout_seconds: int = 180
     business_analysis_context_char_limit: int = 12000
+
+    @field_validator("app_mode", mode="after")
+    @classmethod
+    def _validate_app_mode(cls, value: str) -> str:
+        """只接受 real / demo，非法值直接让 Settings 构造失败。
+
+        报错只点名变量和合法取值，不回显原始输入——和本模块其它校验保持同一个习惯：
+        配置类的错误消息一旦开始「顺手带上当前值」，总有一天会带上不该带的那一个。
+
+        大小写和首尾空白被宽容处理（"Demo" 能用），因为这两类差异是输入方式问题，
+        不是配置错误；而拼错的词必须当场失败，不能猜。
+        """
+        normalized = (value or "").strip().lower()
+        if normalized not in SUPPORTED_APP_MODES:
+            raise ValueError(
+                "APP_MODE 只能是 real 或 demo 之一，当前填的是别的值。"
+                "real 走真实的模型与检索链路；demo 用确定性替身、不调用任何外部服务。"
+            )
+        return normalized
 
     def require_database_url(self) -> str:
         """返回可用的异步连接串；缺失或驱动不对时抛出说明清楚的配置错误。
@@ -332,3 +367,12 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def is_demo_mode() -> bool:
+    """当前是否运行在 demo 模式。
+
+    只读 get_settings()（已 lru_cache），所以这个判断可以在热路径上随便调。
+    全项目只有三处装配点会用它，见 app/runtime.py 的说明。
+    """
+    return get_settings().app_mode == APP_MODE_DEMO

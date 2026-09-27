@@ -214,4 +214,8 @@ def test_openapi_still_lists_every_endpoint():
         "/api/v1/agent/business-analysis/threads",
         "/api/v1/agent/business-analysis/threads/{thread_id}",
         "/api/v1/agent/business-analysis/preferences/{user_id}",
+        # 运行模式阶段新增：前端据此显示 Demo 横幅并列出可问的问题。
+        # 单独开接口而不是往 /health 或 / 上加字段——那两个的响应结构
+        # 已被各自的测试逐字段钉住，而且各有明确职责。
+        "/api/v1/runtime",
     }

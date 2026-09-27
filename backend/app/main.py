@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -6,10 +7,23 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.business_analysis_routes import router as business_analysis_router
 from app.api.routes import router
+from app.core.config import APP_MODE_DEMO, get_settings
 from app.core.logging import configure_logging
 from app.repositories.database import dispose_engine
 
 configure_logging()
+
+# 启动即校验配置。
+#
+# APP_MODE 这类值配错必须在**进程起不来**的时候就暴露，而不是等第一个请求
+# 打进来才失败——后者会表现成「服务起来了但某个接口 500」，排查成本高得多。
+# 校验失败时 Settings 构造抛异常，进程直接退出，这是刻意的。
+_settings = get_settings()
+if _settings.app_mode == APP_MODE_DEMO:
+    logging.getLogger(__name__).warning(
+        "APP_MODE=demo：模型、embedding、精排全部替换为确定性替身，"
+        "所有回答都带 Demo 标识，不代表真实模型输出。"
+    )
 
 # 本地开发允许的前端来源。
 #

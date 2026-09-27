@@ -55,6 +55,18 @@ async def _agent_scope(agent: Any | None):
         yield agent
         return
 
+    # demo 模式**不构造**真实 Agent：Deep Agents 需要模型客户端，而 demo 的
+    # 前提就是一把 Key 都不需要，真去构造会在缺 Key 时抛配置错误，
+    # 让整个经营分析不可用。这里 yield None，事件改由 _agent_events 的 demo 分支产出。
+    #
+    # 注意连接作用域（_connection_scope）**不在**这个分支里跳过：
+    # demo 仍然要建 run 记录、存报告、更新状态，线程历史才照常可用。
+    from app.core.config import is_demo_mode
+
+    if is_demo_mode():
+        yield None
+        return
+
     connection_string = normalize_checkpoint_url(get_settings().require_database_url())
     async with build_postgres_checkpoint(connection_string) as checkpointer:
         await checkpointer.setup()
@@ -138,6 +150,18 @@ async def _agent_events(
     max_tool_calls: int,
     preferences: dict[str, Any] | None = None,
 ) -> AsyncIterator[AnalysisEvent]:
+    # demo 模式换成脚本化步骤，不驱动任何 Agent。
+    # 外层那些「建 run / 存报告 / 更新状态 / 超时 / 错误码」全部照常执行，
+    # 所以 demo 跑完一样在数据库里留下 run 记录和报告。
+    from app.core.config import is_demo_mode
+
+    if is_demo_mode():
+        from app.demo.business_analysis import demo_analysis_events
+
+        async for event in demo_analysis_events(request):
+            yield event
+        return
+
     messages: list[dict[str, str]] = [{"role": "user", "content": request.message}]
     preference_context = _preference_context(preferences or {})
     if preference_context is not None:

@@ -406,6 +406,16 @@ async def answer_from_knowledge(
             "后者是纯向量检索的注入缝，同时给出无法判断该用哪条。"
         )
 
+    # demo 模式：只走仓库内文档的关键词定位，不做改写、不算向量、不调精排和模型。
+    # 三个依赖都为空才触发——**注入优先于模式**，这样测试里传进来的替身
+    # 永远说了算，不会因为跑测试时恰好是 demo 而拿到演示答案。
+    from app.core.config import is_demo_mode
+
+    if retriever is None and searcher is None and llm is None and is_demo_mode():
+        from app.demo.knowledge import demo_answer_from_knowledge
+
+        return await demo_answer_from_knowledge(question, top_k=top_k)
+
     normalized = normalize_query(question)
 
     retrieval: RagRetrievalSummary | None = None

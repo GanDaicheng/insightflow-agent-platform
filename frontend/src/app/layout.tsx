@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { DemoModeBanner } from "@/components/platform/DemoModeBanner";
 import { PlatformShell } from "@/components/platform/PlatformShell";
 import {
   PLATFORM_NAME,
@@ -20,6 +21,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="zh-CN">
       <body>
+        {/* Demo 模式标识条。真实模式下它渲染成 null，页面上不留痕迹。 */}
+        <DemoModeBanner />
         <PlatformShell>{children}</PlatformShell>
       </body>
     </html>
