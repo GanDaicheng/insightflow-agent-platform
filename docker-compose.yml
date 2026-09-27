@@ -1,15 +1,27 @@
-# 本地开发用的三服务编排：PostgreSQL + FastAPI 后端 + Next.js 前端
+# 本地开发用的编排：PostgreSQL + FastAPI 后端 + Next.js 前端，外加一个
+# 可选的**一次性初始化服务** init（迁移 + 种子数据 + 知识库，跑完即退出）。
 #
-# 一键启动（都必须在项目根目录执行）：
+# 日常启动（都必须在项目根目录执行）：
 #   docker compose up --build        前台启动，Ctrl+C 停止
 #   docker compose up --build -d     后台启动
-#   docker compose ps                查看三个服务的状态与健康情况
-#   docker compose logs -f backend   跟踪某个服务的日志（backend/postgres/frontend）
+#   docker compose ps                查看服务状态与健康情况
+#   docker compose logs -f backend   跟踪某个服务的日志
 #   docker compose down              停止并删除容器（数据保留）
 #   docker compose down -v           连数据卷一起删除，数据全部丢失，慎用
 #
-# 启动顺序不是「一起启动」，而是由健康检查串成一条链：
-#   postgres healthy → backend healthy → frontend healthy
+# 干净环境首次搭建（三条命令，顺序明确）：
+#   1. docker compose up -d postgres
+#   2. docker compose --profile init run --rm init     # 迁移 + 种子 + 知识库
+#   3. docker compose up -d backend frontend
+# 也可以一条命令拉起全部（init 跑完 backend 才启动）：
+#   docker compose --profile init up -d
+#
+# init 为什么要放在 profile 里：它每次都要连数据库、读文档、可能还要调
+# embedding 接口，而日常改代码后的 up 完全不需要重跑。放进 profile 之后，
+# 普通 up 不会碰它，需要时才显式启用。重复执行是安全的（幂等）。
+#
+# 启动顺序不是「一起启动」，而是由健康检查和完成状态串成一条链：
+#   postgres healthy → init completed（若启用）→ backend healthy → frontend healthy
 # 每一环都等前一环真的可用才继续，避免后端比数据库先起来而连接失败。
 #
 # 变量取值顺序：shell 环境变量 > 项目根的 .env > 本文件里的默认值。
@@ -49,6 +61,59 @@ services:
       retries: 10
       # 首次启动要跑 initdb，给足初始化时间，这段时间内的失败不计入 retries
       start_period: 15s
+
+  # 一次性初始化服务：迁移 → 零售种子数据 → 知识库种子文档。
+  #
+  # 它是一个**跑完就退出**的容器，不是常驻服务：restart: "no" 保证它不会
+  # 失败后无限重启，也不会在后台一直占着。
+  #
+  # 为什么挂在 "init" profile 下、而不是每次 up 都自动跑：
+  # 开发时改一行代码就要 up 一次，每次重跑初始化既慢又没必要。放进 profile 后，
+  # 日常 `docker compose up` 只起 postgres + backend + frontend，秒级完成；
+  # 需要初始化（首次搭建、或想重建种子数据）时才显式启用。
+  #
+  # 完整冷启动顺序（三条命令，顺序是明确的）：
+  #   docker compose up -d postgres
+  #   docker compose --profile init run --rm init
+  #   docker compose up -d backend frontend
+  #
+  # 或者一条命令拉起全部（init 跑完 backend 才启动，见 backend 的 depends_on）：
+  #   docker compose --profile init up -d
+  #
+  # 重复执行是安全的：迁移按 alembic_version 判断、零售数据用
+  # ON CONFLICT DO NOTHING、知识切片按内容 hash 跳过未变化的。
+  init:
+    build:
+      # 与 backend 共用同一个镜像：初始化需要的 alembic / scripts /
+      # knowledge_seed 都已经在镜像里（见 backend/Dockerfile）。
+      context: .
+      dockerfile: backend/Dockerfile
+    # 不进默认 profile：普通 up 不会启动它
+    profiles: ["init"]
+    # 一次性任务：跑完即退出，失败也不重启
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 容器内连数据库必须走服务名 postgres，不能用 localhost
+      DATABASE_URL: "${DATABASE_URL_DOCKER:-postgresql+asyncpg://data_platform:data_platform_dev@postgres:5432/data_platform}"
+      # 知识库导入要用：embedding 是硬性门槛，对话模型只影响元数据质量
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-dashscope}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-v4}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1024}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.deepseek.com/v1}
+      MODEL_NAME: ${MODEL_NAME:-deepseek-chat}
+      # auto（默认）：有 embedding 配置就导入，没有就跳过并警告，退出码仍为 0。
+      # required：缺配置必须失败，用于真实模式与严格部署检查。
+      # skip：明确跳过，用于无 Key 的基础环境。
+      INIT_KNOWLEDGE_MODE: ${INIT_KNOWLEDGE_MODE:-auto}
+    # 显式写命令，不依赖镜像的 CMD（那个是 uvicorn）：
+    # 同一个镜像两种用法，靠这里的 command 区分。
+    command: ["python", "scripts/initialize_demo.py"]
 
   backend:
     build:
@@ -99,6 +164,15 @@ services:
       postgres:
         # 等 postgres 健康检查真的通过，而不是只等容器「启动」
         condition: service_healthy
+      init:
+        # 启用 init profile 时，等一次性初始化真正跑完（迁移 + 种子 + 知识库）
+        # 再启动后端，避免后端连上一个还没有表的空库。
+        #
+        # required: false 是关键：init 属于 "init" profile，普通
+        # `docker compose up` 不会启用它。没有这一行，Compose 会因为
+        # 「依赖了一个未启用 profile 的服务」直接报错，把现有的日常启动方式弄坏。
+        condition: service_completed_successfully
+        required: false
     ports:
       # 宿主机 8000 -> 容器 8000
       - "8000:8000"

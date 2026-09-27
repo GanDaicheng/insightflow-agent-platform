@@ -26,6 +26,20 @@ RUN pip install -r requirements.txt
 # 那样会把 tests/ 和 requirements-dev.txt 一起带进生产镜像。
 COPY backend/app ./app
 
+# 以下四项是一次性初始化容器（init 服务）需要的资产，运行时业务不碰它们。
+#
+# 为什么和后端放进同一个镜像，而不是再拆一个多阶段 target：
+#   1. 体积代价极小 —— 迁移脚本 + 种子脚本 + 9 份知识 Markdown，合计约 200 KB；
+#   2. 多阶段会引入一个隐蔽陷阱：加了第二个 stage 之后，Docker 的**默认 target
+#      会变成最后一个 stage**，backend 服务若忘了写 `target: runtime`，
+#      生产后端就会误用初始化镜像启动；
+#   3. 「一个镜像、两种用法」在本项目的规模下更简单：init 只是换个启动命令。
+# 将来若确实要让生产镜像瘦下来，把远端 stage 命名并加 `target:` 即可，改动很小。
+COPY backend/alembic ./alembic
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/scripts ./scripts
+COPY backend/knowledge_seed ./knowledge_seed
+
 EXPOSE 8000
 
 # 生产不用 --reload：热重载是开发期特性，会常驻文件监听进程，且行为不稳定。
