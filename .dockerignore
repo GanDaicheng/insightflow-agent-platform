@@ -16,6 +16,10 @@
 # 镜像分层是可被任何人 `docker history` / 导出查看的，密钥一旦进去就等同于泄露。
 .env
 .env.*
+# `.env.*` 会连带匹配 .env.example，但那份文件只含示例值、本来就随代码提交，
+# 没有理由排除它。用 `!` 放行，和 .gitignore 里的 `!.env.example` 保持对称。
+# 规则按「后者覆盖前者」生效，所以这一行必须排在 `.env.*` 之后。
+!.env.example
 
 # --- 虚拟环境：容器内的依赖由 pip 重新安装，宿主机的不通用 ---
 .venv
@@ -39,6 +43,15 @@ frontend/.next
 # --- 本机资料，构建用不到 ---
 *.docx
 docs
+
+# --- 本机数据与 Git 工作树：体积大，且镜像完全用不到 ---
+# codex数据/ 是本机的数据、渲染产物和临时文件（约 2.4 GB）。
+# .worktrees/ 是 Git 工作树副本（约 667 MB），里面还有自己的一份
+# frontend/node_modules 和一个真实的 .env —— 后者虽然不会进镜像
+# （Dockerfile 只 COPY 指定路径），但没有理由让它离开本机。
+# 不排除这两项的话，每次构建都要多传约 3.1 GB 给 Docker 守护进程。
+codex数据/
+.worktrees/
 
 # 以下文件必须保留在上下文中，不要加进本文件：
 #   requirements.txt          后端依赖清单，Dockerfile 要 COPY 它
