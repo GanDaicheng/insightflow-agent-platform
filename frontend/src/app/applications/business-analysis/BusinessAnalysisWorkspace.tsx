@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isAbortError } from "@/lib/api/http";
 import {
   createAnonymousUserId,
+  deleteAnalysisThread,
   loadAnalysisThread,
   loadAnalysisThreads,
   runBusinessAnalysis,
@@ -29,13 +30,13 @@ type Thread = { id: string; title: string; updatedAt: string };
 /** 示例只填入输入框，不直接发送——点一下就是一次真实的模型调用，太重了。 */
 const EXAMPLES = [
   {
-    label: "分析华东第三季度销售下降原因…",
+    label: "分析某省第三季度销售下降原因…",
     question:
-      "分析华东地区第三季度销售下降原因，找出影响最大的品类，并结合促销规则给出建议。",
+      "分析某省第三季度销售下降原因，找出影响最大的品类，并结合促销规则给出建议。",
   },
   {
-    label: "对比华东和华南会员复购率…",
-    question: "对比华东和华南的会员复购率，解释差异并给出提升建议。",
+    label: "分析退款率较高的品类…",
+    question: "分析退款率较高的品类，结合售后原因和物流时效解释差异并给出建议。",
   },
   {
     label: "分析全年销售额季节性变化…",
@@ -80,6 +81,7 @@ export function BusinessAnalysisWorkspace() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
+  const [threadError, setThreadError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -231,7 +233,29 @@ export function BusinessAnalysisWorkspace() {
     setMessages([]);
     setQuestion("");
     setPhase("idle");
+    setThreadError(null);
   }, []);
+
+  const deleteThread = useCallback(async (thread: Thread) => {
+    if (phase === "running") return;
+    if (!window.confirm(`确定删除“${thread.title}”吗？删除后无法恢复。`)) return;
+
+    setThreadError(null);
+    try {
+      await deleteAnalysisThread(thread.id, userId);
+      setThreads((current) => current.filter((item) => item.id !== thread.id));
+      if (activeThread.id === thread.id) {
+        loadSeqRef.current += 1;
+        abortRef.current?.abort();
+        setActiveThread(newThread());
+        setMessages([]);
+        setQuestion("");
+        setPhase("idle");
+      }
+    } catch {
+      setThreadError("删除失败，请稍后重试。");
+    }
+  }, [activeThread.id, phase, userId]);
 
   const pickExample = useCallback((value: string) => {
     setQuestion(value);
@@ -246,6 +270,8 @@ export function BusinessAnalysisWorkspace() {
         busy={phase === "running"}
         onNew={startNew}
         onSelect={(thread) => void selectThread(thread)}
+        onDelete={(thread) => void deleteThread(thread)}
+        footer={threadError ? <p className={styles.threadError} role="alert">{threadError}</p> : null}
       />
       <div className={styles.chatColumn}>
         <header className={styles.chatHeader}>

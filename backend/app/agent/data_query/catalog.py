@@ -1,8 +1,8 @@
 """模拟资产目录：智能问数 Agent 的「知识层」。
 
 本文件里登记的指标和数据集是**人工维护的受控清单**，不是从 ORM 模型自动推导的。
-真实数仓表（orders / customers / products / regions / date_dim）已经由 Alembic 迁移
-建出、并由种子脚本写入样例数据，模型定义在 app/models/retail.py。
+真实数仓表（订单、商品、渠道、促销、履约、库存、广告和售后）已经由 Alembic 迁移
+建出、并由种子脚本写入演示数据，模型定义在 app/models/retail.py。
 
 为什么不让它自动从模型推导？和 services/safe_query.py 的理由一致：自动推导意味着
 给某张表加一个字段，它会立刻对所有下游可见。显式登记强迫每次扩权都经过一次有意识的
@@ -32,7 +32,7 @@ test_catalog_fields_all_exist_in_models 会守住这条约束。
 
 ## 每个资产都登记了 domain
 
-目录里现在有两个领域：零售样例数仓（orders 等五张表）与天猫 IJCAI 2015
+目录里现在有两个领域：电商经营数仓（orders 等运营表）与天猫 IJCAI 2015
 数据集（tmall_daily_metrics 等六张 Gold 表）。
 
 检索会先按问题路由出领域（见 domain.py），再**只在该领域的资产里匹配**。
@@ -118,6 +118,76 @@ METRICS: tuple[MetricSpec, ...] = (
         "formula": "COUNT(下单次数 > 1 的客户) / COUNT(DISTINCT orders.customer_id)",
         "supported_dimensions": ("日期", "区域", "客户会员等级"),
         "keywords": ("复购率", "复购", "重复购买率", "回购率", "二次购买"),
+    },
+    {
+        "kind": "metric",
+        "name": "gross_profit",
+        "display_name": "毛利",
+        "domain": DOMAIN_RETAIL,
+        "definition": "实付金额减去商品销售成本；成本来自商品维度 cost_price，不含广告费和物流费。",
+        "formula": "SUM(orders.net_amount - orders.quantity * products.cost_price)",
+        "supported_dimensions": ("日期", "省份", "商品", "品类", "渠道"),
+        "keywords": ("毛利", "利润", "商品利润", "赚了多少", "盈利"),
+    },
+    {
+        "kind": "metric",
+        "name": "gross_margin",
+        "display_name": "毛利率",
+        "domain": DOMAIN_RETAIL,
+        "definition": "毛利除以实付销售额，成本口径只包含商品成本。",
+        "formula": "SUM(orders.net_amount - orders.quantity * products.cost_price) / SUM(orders.net_amount)",
+        "supported_dimensions": ("日期", "省份", "商品", "品类", "渠道"),
+        "keywords": ("毛利率", "利润率", "盈利能力"),
+    },
+    {
+        "kind": "metric",
+        "name": "refund_rate",
+        "display_name": "退款率",
+        "domain": DOMAIN_RETAIL,
+        "definition": "退款金额除以同期实付销售额；售后按订单号与订单事实关联。",
+        "formula": "SUM(after_sales.refund_amount) / SUM(orders.net_amount)",
+        "supported_dimensions": ("日期", "省份", "商品", "品类", "售后原因"),
+        "keywords": ("退款率", "退款", "退货", "售后率", "售后金额"),
+    },
+    {
+        "kind": "metric",
+        "name": "average_delivery_days",
+        "display_name": "平均物流时效",
+        "domain": DOMAIN_RETAIL,
+        "definition": "订单履约记录中的 delivery_days 平均值，反映从发货到签收的天数。",
+        "formula": "AVG(order_operations.delivery_days)",
+        "supported_dimensions": ("日期", "省份", "渠道", "仓库省份"),
+        "keywords": ("物流时效", "配送时长", "平均送达", "几天送达", "履约时效"),
+    },
+    {
+        "kind": "metric",
+        "name": "stockout_rate",
+        "display_name": "缺货率",
+        "domain": DOMAIN_RETAIL,
+        "definition": "库存快照中 stockout_flag 为真的 SKU-省份快照占比。",
+        "formula": "SUM(CASE WHEN inventory_snapshots.stockout_flag = TRUE THEN 1 ELSE 0 END) / COUNT(inventory_snapshots.product_id)",
+        "supported_dimensions": ("月份", "省份", "商品", "品类"),
+        "keywords": ("缺货率", "缺货", "库存告警", "库存不足", "断货"),
+    },
+    {
+        "kind": "metric",
+        "name": "ad_roas",
+        "display_name": "广告 ROAS",
+        "domain": DOMAIN_RETAIL,
+        "definition": "广告归因销售额除以广告花费，用于判断投放产出。",
+        "formula": "SUM(ad_daily_metrics.attributed_sales_amount) / SUM(ad_daily_metrics.spend_amount)",
+        "supported_dimensions": ("日期", "渠道", "广告活动", "商品"),
+        "keywords": ("ROAS", "投产比", "广告产出", "广告效果", "投放回报"),
+    },
+    {
+        "kind": "metric",
+        "name": "ad_ctr",
+        "display_name": "广告点击率",
+        "domain": DOMAIN_RETAIL,
+        "definition": "广告点击次数除以曝光次数，用于判断素材和定向吸引力。",
+        "formula": "SUM(ad_daily_metrics.clicks) / SUM(ad_daily_metrics.impressions)",
+        "supported_dimensions": ("日期", "渠道", "广告活动", "商品"),
+        "keywords": ("点击率", "CTR", "广告点击", "曝光点击"),
     },
     # ---------------------------- 天猫领域 ----------------------------
     #
@@ -339,12 +409,14 @@ DATASETS: tuple[DatasetSpec, ...] = (
         "name": "customers",
         "display_name": "客户",
         "domain": DOMAIN_RETAIL,
-        "description": "客户主数据，提供会员等级等客户属性，用于按会员分层分析和复购计算。",
+        "description": "公司客户主数据，用于统计客户购买频次、复购行为和商品购买结构；member_level 仅为兼容旧表结构，不作为本电商演示的分析维度。",
         "fields": {
             "customer_id": "客户 ID，关联 orders.customer_id",
+            "customer_name": "合成客户名称，仅用于结果展示",
+            "registered_at": "客户注册日期",
             "member_level": "会员等级，取值仅四种：普通会员、银卡会员、金卡会员、黑金会员",
         },
-        "keywords": ("客户", "会员", "用户", "复购", "会员等级", "等级"),
+        "keywords": ("客户", "用户", "复购", "购买频次", "回购", "重复购买"),
     },
     {
         "kind": "dataset",
@@ -355,7 +427,9 @@ DATASETS: tuple[DatasetSpec, ...] = (
         "fields": {
             "product_id": "商品 ID，关联 orders.product_id",
             "product_name": "商品名称",
-            "category_name": "商品品类，例如家用电器、数码配件、厨房用品、服饰鞋帽、美妆个护、食品饮料",
+            "category_name": "商品品类，例如数码产品、电脑办公、家用电器、食品饮料、服饰鞋包、美妆个护、家居日用",
+            "unit_price": "商品标价",
+            "cost_price": "商品单位成本；基线库历史数据可能为空，演示库已填充",
         },
         "keywords": ("商品", "产品", "品类", "类目", "销量", "单品"),
     },
@@ -364,12 +438,16 @@ DATASETS: tuple[DatasetSpec, ...] = (
         "name": "regions",
         "display_name": "区域",
         "domain": DOMAIN_RETAIL,
-        "description": "销售区域主数据，提供大区名称，用于地区维度分析。",
+        "description": "公司订单省份主数据，提供订单归属或配送省份，用于公司内部地域分析，不代表全国市场规模。",
         "fields": {
             "region_id": "区域 ID，关联 orders.region_id",
-            "region_name": "区域名称，例如华东、华南、华北、华中",
+            "region_name": "省份名称，例如广东省、江苏省、浙江省、上海市、北京市",
         },
-        "keywords": ("区域", "地区", "大区", "省份", "城市", "华东", "华南", "华北"),
+        "keywords": (
+            "区域", "地区", "大区", "省份", "城市",
+            "广东省", "江苏省", "浙江省", "上海市", "北京市", "四川省",
+            "湖北省", "福建省", "山东省", "河南省", "湖南省", "河北省",
+        ),
     },
     {
         "kind": "dataset",
@@ -385,6 +463,125 @@ DATASETS: tuple[DatasetSpec, ...] = (
             "quarter": "季度",
         },
         "keywords": ("日期", "时间", "月", "月份", "季度", "年", "趋势", "近六个月", "同比", "环比"),
+    },
+    {
+        "kind": "dataset",
+        "name": "channels",
+        "display_name": "销售渠道",
+        "domain": DOMAIN_RETAIL,
+        "description": "公司订单来源渠道字典，用于比较自营、平台、内容电商和私域渠道。",
+        "fields": {
+            "channel_id": "渠道 ID，关联 order_operations.channel_id 和 ad_campaigns.channel_id",
+            "channel_name": "渠道名称，例如自营商城、淘宝店、京东店、抖音商城、小程序商城",
+            "channel_type": "渠道类型，例如自营、平台、内容电商、私域",
+        },
+        "keywords": ("渠道", "来源", "平台", "自营", "淘宝", "京东", "抖音", "小程序"),
+    },
+    {
+        "kind": "dataset",
+        "name": "promotions",
+        "display_name": "促销活动",
+        "domain": DOMAIN_RETAIL,
+        "description": "公司促销活动日历和预算，用于解释折扣、销售变化和活动投入。",
+        "fields": {
+            "promotion_id": "促销活动 ID",
+            "promotion_name": "促销活动名称",
+            "promotion_type": "活动类型，例如满减、折扣",
+            "start_date_id": "活动开始日期",
+            "end_date_id": "活动结束日期",
+            "discount_rate": "活动标称折扣率",
+            "budget_amount": "活动预算金额",
+        },
+        "keywords": ("促销", "活动", "优惠", "折扣", "满减", "双十一", "预算"),
+    },
+    {
+        "kind": "dataset",
+        "name": "order_operations",
+        "display_name": "订单履约运营",
+        "domain": DOMAIN_RETAIL,
+        "description": "每笔订单一条履约记录，补充渠道、促销归因、仓库、省份和物流时效。",
+        "fields": {
+            "order_no": "订单号，关联 orders.order_no",
+            "channel_id": "来源渠道 ID",
+            "promotion_id": "关联促销活动 ID，可为空",
+            "warehouse_province": "发货仓所在省份",
+            "shipped_date_id": "发货日期",
+            "delivered_date_id": "签收日期",
+            "delivery_days": "从发货到签收的天数",
+            "shipping_fee": "订单物流费用",
+            "fulfillment_status": "履约状态",
+        },
+        "keywords": ("履约", "物流", "发货", "签收", "配送", "仓库", "时效", "渠道归因"),
+    },
+    {
+        "kind": "dataset",
+        "name": "inventory_snapshots",
+        "display_name": "库存快照",
+        "domain": DOMAIN_RETAIL,
+        "description": "按月、SKU、省份保存库存变化，用于缺货、库存周转和补货分析。",
+        "fields": {
+            "snapshot_date_id": "库存快照月份，关联 date_dim.date_id",
+            "product_id": "SKU ID",
+            "region_id": "库存归属省份 ID",
+            "opening_stock": "期初库存",
+            "inbound_qty": "入库数量",
+            "sold_qty": "期间销售数量",
+            "ending_stock": "期末库存",
+            "stockout_flag": "是否发生缺货",
+        },
+        "keywords": ("库存", "库存快照", "缺货", "补货", "周转", "期末库存", "SKU库存"),
+    },
+    {
+        "kind": "dataset",
+        "name": "ad_campaigns",
+        "display_name": "广告活动",
+        "domain": DOMAIN_RETAIL,
+        "description": "广告活动主数据，关联投放渠道、商品、活动周期和预算。",
+        "fields": {
+            "campaign_id": "广告活动 ID",
+            "campaign_name": "广告活动名称",
+            "channel_id": "投放渠道 ID",
+            "product_id": "推广商品 SKU，可为空",
+            "start_date_id": "投放开始日期",
+            "end_date_id": "投放结束日期",
+            "budget_amount": "投放预算金额",
+        },
+        "keywords": ("广告", "投放", "广告活动", "推广", "预算", "campaign"),
+    },
+    {
+        "kind": "dataset",
+        "name": "ad_daily_metrics",
+        "display_name": "广告投放日报",
+        "domain": DOMAIN_RETAIL,
+        "description": "广告活动的日粒度曝光、点击、转化、花费与归因销售数据。",
+        "fields": {
+            "campaign_id": "广告活动 ID",
+            "date_id": "投放日期",
+            "spend_amount": "广告花费",
+            "impressions": "曝光次数",
+            "clicks": "点击次数",
+            "conversions": "归因转化次数",
+            "attributed_sales_amount": "归因销售额",
+        },
+        "keywords": ("广告日报", "曝光", "点击", "转化", "花费", "归因销售额", "ROAS", "CTR"),
+    },
+    {
+        "kind": "dataset",
+        "name": "after_sales",
+        "display_name": "退款售后",
+        "domain": DOMAIN_RETAIL,
+        "description": "订单售后事实，记录退款类型、原因、状态与退款金额。",
+        "fields": {
+            "after_sale_id": "售后记录 ID",
+            "order_no": "订单号，关联 orders.order_no",
+            "after_sale_type": "售后类型，例如仅退款、退货退款",
+            "reason": "售后原因，例如质量问题、物流破损、不喜欢",
+            "status": "处理状态，例如已完成、处理中",
+            "refund_amount": "实际退款金额",
+            "request_date_id": "售后申请日期",
+            "completed_date_id": "售后完成日期，可为空",
+        },
+        "keywords": ("售后", "退款", "退货", "换货", "退款原因", "退款金额", "质量问题"),
     },
     # ---------------------------- 天猫领域 ----------------------------
     #

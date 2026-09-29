@@ -48,7 +48,7 @@ RETRIEVAL_METADATA_COLUMNS = {"keywords", "aliases", "search_text"}
 # 迁移之前的 5 张零售表 + alembic 自己的版本表，字段一个都不该变
 RETAIL_TABLE_COLUMNS = {
     "customers": {"customer_id", "customer_name", "member_level", "registered_at", "created_at"},
-    "products": {"product_id", "product_name", "category_name", "unit_price", "created_at"},
+    "products": {"product_id", "product_name", "category_name", "unit_price", "cost_price", "created_at"},
     "regions": {"region_id", "region_name", "region_level", "created_at"},
     "date_dim": {
         "date_id", "full_date", "year", "quarter", "month",

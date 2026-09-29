@@ -1164,6 +1164,13 @@ def test_catalog_covers_the_agreed_metrics_and_datasets():
         "order_count",
         "average_order_value",
         "repurchase_rate",
+        "gross_profit",
+        "gross_margin",
+        "refund_rate",
+        "average_delivery_days",
+        "stockout_rate",
+        "ad_roas",
+        "ad_ctr",
         # 天猫
         "tmall_behavior_count",
         "tmall_action_user_count",
@@ -1186,6 +1193,13 @@ def test_catalog_covers_the_agreed_metrics_and_datasets():
         "products",
         "regions",
         "date_dim",
+        "channels",
+        "promotions",
+        "order_operations",
+        "inventory_snapshots",
+        "ad_campaigns",
+        "ad_daily_metrics",
+        "after_sales",
         # 天猫：只有 Gold 汇总表
         "tmall_daily_metrics",
         "tmall_funnel_metrics",
@@ -1410,11 +1424,11 @@ def test_discover_assets_records_a_count_event():
 def test_question_without_known_assets_does_not_set_error():
     """检索不到不等于问数失败：只记事件，不写 error，流程照常收尾。
 
-    这里用正常意图 + 目录里没有的领域词汇（「库存周转」没登记）。
+    这里用正常意图 + 目录里没有的领域词汇（「门店坪效」没登记）。
     """
     classifier = FakeClassifier(intent="breakdown", reason="疑似维度拆分")
     generator = FakeSqlGenerator()
-    result = graph_with(classifier, generator).invoke({"question": "库存周转情况如何"})
+    result = graph_with(classifier, generator).invoke({"question": "门店坪效如何"})
 
     assert result["intent"] == "breakdown"
     assert result["matched_assets"] == []
@@ -3525,7 +3539,7 @@ def test_question_without_assets_skips_sql_generation_entirely():
     explainer = FakeResultExplainer()
 
     result = graph_with(classifier, generator, repairer, executor, explainer).invoke(
-        {"question": "库存周转情况如何"}
+        {"question": "门店坪效如何"}
     )
 
     assert generator.calls == []

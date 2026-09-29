@@ -164,6 +164,16 @@ export async function loadAnalysisThreads(userId: string): Promise<AnalysisThrea
   return (await response.json()) as AnalysisThreadSummary[];
 }
 
+export async function deleteAnalysisThread(threadId: string, userId: string): Promise<void> {
+  const response = await fetch(
+    buildApiUrl(
+      `/api/v1/agent/business-analysis/threads/${encodeURIComponent(threadId)}?user_id=${encodeURIComponent(userId)}`,
+    ),
+    { method: "DELETE" },
+  );
+  if (!response.ok) throw new Error(`删除分析会话失败（${response.status}）。`);
+}
+
 export async function loadUserPreferences(userId: string): Promise<Record<string, unknown>> {
   const response = await fetch(
     buildApiUrl(`/api/v1/agent/business-analysis/preferences/${encodeURIComponent(userId)}`),

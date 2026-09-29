@@ -72,7 +72,7 @@ LOCK_TIMEOUT_MS = 1_000
 ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
     # ---- 零售领域 ----
     "customers": frozenset({"customer_id", "member_level"}),
-    "products": frozenset({"product_id", "product_name", "category_name"}),
+    "products": frozenset({"product_id", "product_name", "category_name", "unit_price", "cost_price"}),
     "regions": frozenset({"region_id", "region_name"}),
     "date_dim": frozenset({"date_id", "full_date", "year", "quarter", "month"}),
     "orders": frozenset(
@@ -87,6 +87,43 @@ ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
             "gross_amount",
             "discount_amount",
             "net_amount",
+        }
+    ),
+    "channels": frozenset({"channel_id", "channel_name", "channel_type"}),
+    "promotions": frozenset(
+        {
+            "promotion_id", "promotion_name", "promotion_type", "start_date_id", "end_date_id",
+            "discount_rate", "budget_amount",
+        }
+    ),
+    "order_operations": frozenset(
+        {
+            "order_no", "channel_id", "promotion_id", "warehouse_province", "shipped_date_id",
+            "delivered_date_id", "delivery_days", "shipping_fee", "fulfillment_status",
+        }
+    ),
+    "inventory_snapshots": frozenset(
+        {
+            "snapshot_date_id", "product_id", "region_id", "opening_stock", "inbound_qty",
+            "sold_qty", "ending_stock", "stockout_flag",
+        }
+    ),
+    "ad_campaigns": frozenset(
+        {
+            "campaign_id", "campaign_name", "channel_id", "product_id", "start_date_id",
+            "end_date_id", "budget_amount",
+        }
+    ),
+    "ad_daily_metrics": frozenset(
+        {
+            "campaign_id", "date_id", "spend_amount", "impressions", "clicks", "conversions",
+            "attributed_sales_amount",
+        }
+    ),
+    "after_sales": frozenset(
+        {
+            "after_sale_id", "order_no", "after_sale_type", "reason", "status", "refund_amount",
+            "request_date_id", "completed_date_id",
         }
     ),
     # ---- 天猫领域 ----
@@ -188,6 +225,8 @@ ALLOWED_FUNCTIONS: tuple[type[exp.Func], ...] = (
     exp.Min,
     exp.Max,
 )
+
+_AGGREGATE_FUNCTIONS: tuple[type[exp.Func], ...] = ALLOWED_FUNCTIONS
 
 
 # --------------------------------------------------------------------------
@@ -435,7 +474,27 @@ def _validate_projection(tree: exp.Select, issues: list[str]) -> None:
 
 def _validate_functions(tree: exp.Expression, issues: list[str]) -> None:
     for node in tree.walk():
-        if isinstance(node, exp.Func) and not isinstance(node, ALLOWED_FUNCTIONS):
+        # sqlglot models boolean connectors and arithmetic operators as
+        # subclasses of Func too. They are expressions, not callable
+        # database functions, so filtered metrics and AOV division remain
+        # available.
+        if isinstance(node, exp.Binary) and not isinstance(node, (exp.Case, exp.If)):
+            continue
+        if not isinstance(node, exp.Func):
+            continue
+
+        if isinstance(node, (exp.Case, exp.If)):
+            # Conditional expressions are useful for safe conditional
+            # aggregation, but a standalone CASE/IF remains disallowed.
+            ancestor = node.parent
+            while ancestor is not None and not isinstance(
+                ancestor, _AGGREGATE_FUNCTIONS
+            ):
+                ancestor = ancestor.parent
+            if isinstance(ancestor, _AGGREGATE_FUNCTIONS):
+                continue
+
+        if not isinstance(node, ALLOWED_FUNCTIONS):
             issues.append(ISSUE_UNAUTHORIZED_FUNCTION)
             return
 

@@ -121,6 +121,7 @@ EMPTY_CHART: ChartSuggestion = {
     "title": "暂无可视化数据",
     "x_field": None,
     "y_field": None,
+    "y_fields": [],
     "series_field": None,
     "value_format": None,
     "reason": "查询结果为空，无法生成图表。",
@@ -132,10 +133,28 @@ FALLBACK_CHART: ChartSuggestion = {
     "title": "查询结果明细",
     "x_field": None,
     "y_field": None,
+    "y_fields": [],
     "series_field": None,
     "value_format": None,
     "reason": "结果字段不满足当前受控图表规则，建议先以表格查看。",
 }
+
+# 多指标图表只合并同一展示单位的指标，避免把金额、数量和百分比放在
+# 同一条纵轴上造成误读。顺序也是图例和主指标的稳定顺序。
+_SAME_UNIT_METRICS: dict[str, tuple[str, ...]] = {
+    "currency": ("sales_amount", "gross_profit", "ad_spend", "refund_amount"),
+    "number": ("order_count", "units_sold", "impressions", "clicks"),
+    "percent": ("gross_margin", "refund_rate", "ad_ctr", "stockout_rate"),
+}
+
+
+def _y_fields_for_result(*, rule: _ChartRule, columns: set[str]) -> list[str]:
+    """从查询结果中选择与主指标同单位的可绘制指标。"""
+    candidates = _SAME_UNIT_METRICS.get(rule.value_format, ())
+    fields = [field for field in candidates if field in columns]
+    if rule.y_field not in fields:
+        return [rule.y_field]
+    return fields or [rule.y_field]
 
 
 def chart_rules_for_domain(domain: str) -> dict[str, _ChartRule]:
@@ -189,6 +208,7 @@ def suggest_chart(
         "title": rule.title,
         "x_field": rule.x_field,
         "y_field": rule.y_field,
+        "y_fields": _y_fields_for_result(rule=rule, columns=columns),
         # 当前四类意图都是「一个维度 + 一个度量」，不需要分组。
         # 留着这个字段是为了前端契约稳定：将来加分组维度时，
         # 前端不用改取值方式，只是这个字段开始有值。

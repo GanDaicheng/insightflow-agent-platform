@@ -14,7 +14,7 @@ flowchart TB
 
     subgraph ORCH[Agent 编排与服务层]
         ROUTER[领域路由与运行模式装配]
-        DQ[LangGraph 智能问数 Agent]
+        DQ[LangGraph 智能图表 Agent]
         RAG[RAG 知识问答服务]
         BA[Deep Agents 经营分析 Agent]
         SAFE[安全查询服务\nAST 校验 + 只读事务]
@@ -70,7 +70,7 @@ flowchart TB
 | 数据层 | PostgreSQL + pgvector | 同时保存业务数据、知识向量、Agent 状态、偏好和分析报告。 |
 | 状态层 | Checkpoint / Store | 保存可恢复的运行状态和长期偏好。 |
 
-## 2. 智能问数链路
+## 2. 智能图表链路
 
 ```mermaid
 flowchart LR

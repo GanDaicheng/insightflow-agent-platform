@@ -323,7 +323,7 @@ def test_unauthorized_tables_are_rejected(table):
     [
         "SELECT orders.created_at FROM orders LIMIT 5",
         "SELECT customers.customer_name FROM customers LIMIT 5",
-        "SELECT products.unit_price FROM products LIMIT 5",
+        "SELECT products.created_at FROM products LIMIT 5",
         "SELECT date_dim.is_weekend FROM date_dim LIMIT 5",
         "SELECT regions.region_level FROM regions LIMIT 5",
     ],
@@ -489,7 +489,7 @@ def test_whitelist_matches_models():
 
 
 def test_only_whitelisted_tables_are_reachable():
-    """默认拒绝：白名单里只有零售 5 张业务表 + 天猫 6 张 Gold 表。
+    """默认拒绝：白名单里只有登记过的零售运营表 + 天猫 Gold 表。
 
     这张清单是**权限边界**的落地，不是配置细节。任何一张表加进来，
     都意味着 LLM 生成的 SQL 可以查它。加表必须是一次有意识的决定，
@@ -502,6 +502,13 @@ def test_only_whitelisted_tables_are_reachable():
         "regions",
         "date_dim",
         "orders",
+        "channels",
+        "promotions",
+        "order_operations",
+        "inventory_snapshots",
+        "ad_campaigns",
+        "ad_daily_metrics",
+        "after_sales",
         # 天猫领域：只有 Gold 汇总表
         "tmall_daily_metrics",
         "tmall_merchant_metrics",

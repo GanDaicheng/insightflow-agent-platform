@@ -18,7 +18,7 @@
 
 import random
 from bisect import bisect_right
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -411,13 +411,21 @@ def build_orders(
 
 @dataclass(frozen=True)
 class SeedDataSet:
-    """一次性打包五张表的待写入数据。"""
+    """一次性打包基础零售表与可选运营表的待写入数据。"""
 
     regions: list[dict]
     customers: list[dict]
     products: list[dict]
     date_dim: list[dict]
     orders: list[dict]
+    # 基础库仍只生成前五张表；扩展演示库按需填充这些列表。
+    channels: list[dict] = field(default_factory=list)
+    promotions: list[dict] = field(default_factory=list)
+    order_operations: list[dict] = field(default_factory=list)
+    inventory_snapshots: list[dict] = field(default_factory=list)
+    ad_campaigns: list[dict] = field(default_factory=list)
+    ad_daily_metrics: list[dict] = field(default_factory=list)
+    after_sales: list[dict] = field(default_factory=list)
 
 
 def build_seed_dataset() -> SeedDataSet:

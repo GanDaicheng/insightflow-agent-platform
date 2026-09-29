@@ -60,7 +60,7 @@
 Core 语句同样是全参数化的，不存在把文本拼进 SQL 的问题。
 唯一的差别是 ORM 层的 `onupdate` 不会触发，所以更新 `updated_at` 时显式写 `func.now()`。
 
-本模块不建向量索引、不做检索、不碰 retail 五张业务表。
+本模块不建向量索引、不做检索、不碰 retail 业务事实表。
 """
 
 import hashlib

@@ -11,7 +11,10 @@ from app.models.retail import MEMBER_LEVELS, Customer, DateDim, Order, Product, 
 from app.models.tmall import GOLD_TABLES as TMALL_GOLD_TABLES
 from app.models.tmall import SILVER_TABLES as TMALL_SILVER_TABLES
 
-EXPECTED_TABLES = {"customers", "products", "regions", "date_dim", "orders"}
+EXPECTED_TABLES = {
+    "customers", "products", "regions", "date_dim", "orders", "channels", "promotions",
+    "order_operations", "inventory_snapshots", "ad_campaigns", "ad_daily_metrics", "after_sales",
+}
 
 # RAG 阶段新增的两张知识库表。它们由 tests/test_knowledge_models.py 专门覆盖，
 # 这里登记一份是为了让「表集合」这条断言保持完整——

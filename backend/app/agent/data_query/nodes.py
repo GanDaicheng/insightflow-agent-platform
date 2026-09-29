@@ -67,6 +67,7 @@ from app.agent.data_query.result_explanation import (
     with_source_note,
 )
 from app.agent.data_query.sql_generation import (
+    build_tmall_daily_trend_draft,
     SqlDraft,
     generate_sql_draft,
     repair_sql_draft,
@@ -124,7 +125,7 @@ QUERY_RESULT_CONTRACT_EVENT = "execute_query：查询结果不符合约定，已
 # 全部定义在这里而不是散落在分支里：这些是**面向用户的最终话术**，
 # 集中放置便于统一措辞，也方便以后接入前端时一次性拿走。
 UNKNOWN_INTENT_ANSWER = (
-    "我目前只能处理销售趋势、商品排行、维度拆分和会员复购等数据分析问题。"
+    "我目前只能处理销售趋势、商品与品类排行、省份和渠道对比，以及库存、广告和售后指标问题。"
 )
 NO_ASSET_ANSWER = (
     "我没有找到可用于分析的已登记指标或数据集，请换一种数据分析问法。"
@@ -255,7 +256,15 @@ def generate_sql(
     question = (state.get("question") or "").strip()
 
     try:
-        raw = sql_generator(question, intent, matched_assets)
+        has_tmall_daily_dataset = any(
+            asset.get("kind") == "dataset"
+            and asset.get("name") == "tmall_daily_metrics"
+            for asset in matched_assets
+        )
+        if intent == "trend" and has_tmall_daily_dataset:
+            raw = build_tmall_daily_trend_draft(question, intent, matched_assets)
+        else:
+            raw = sql_generator(question, intent, matched_assets)
         # 和 understand_question 一样，不信任返回值，重新校验一遍。
         payload = raw.model_dump() if isinstance(raw, BaseModel) else raw
         draft = SqlDraft.model_validate(payload)

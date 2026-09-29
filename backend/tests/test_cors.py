@@ -131,7 +131,7 @@ def test_cors_does_not_allow_credentials():
 def test_cors_allows_only_the_needed_methods_and_headers():
     kwargs = cors_kwargs()
 
-    assert set(kwargs["allow_methods"]) == {"GET", "POST", "PUT", "OPTIONS"}
+    assert set(kwargs["allow_methods"]) == {"GET", "POST", "PUT", "DELETE", "OPTIONS"}
     assert set(kwargs["allow_headers"]) == {"Content-Type"}
 
 

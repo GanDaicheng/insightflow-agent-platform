@@ -159,6 +159,25 @@ async def load_thread_runs(
     return rows
 
 
+async def delete_user_thread(
+    connection: AsyncConnection,
+    *,
+    thread_id: str,
+    user_id: str,
+) -> None:
+    """Delete one user's thread; report/artifact rows cascade from its runs."""
+    await connection.execute(
+        text(
+            """
+            DELETE FROM business_analysis_runs
+            WHERE thread_id = :thread_id
+              AND user_id = :user_id
+            """
+        ),
+        {"thread_id": thread_id, "user_id": user_id},
+    )
+
+
 async def load_user_threads(
     connection: AsyncConnection,
     *,

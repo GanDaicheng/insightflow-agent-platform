@@ -7,6 +7,7 @@ import pytest
 from app.services.analysis_report import (
     append_artifact,
     create_run,
+    delete_user_thread,
     load_thread_runs,
     load_user_threads,
     save_report,
@@ -146,3 +147,15 @@ async def test_load_user_threads_returns_latest_public_thread_summaries():
         }
     ]
     assert "DISTINCT ON" in str(connection.statements[0][0])
+
+
+@pytest.mark.anyio
+async def test_delete_user_thread_scopes_deletion_to_the_owner():
+    connection = FakeConnection()
+
+    await delete_user_thread(connection, thread_id="thread-1", user_id="user-1")
+
+    assert len(connection.statements) == 1
+    statement, params = connection.statements[0]
+    assert "DELETE FROM business_analysis_runs" in str(statement)
+    assert params == {"thread_id": "thread-1", "user_id": "user-1"}

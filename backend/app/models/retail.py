@@ -66,6 +66,8 @@ class Product(Base):
     product_name: Mapped[str] = mapped_column(String(64), nullable=False)
     category_name: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # 演示库用于毛利分析；基线库历史数据允许为空，避免破坏原有数据。
+    cost_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -145,3 +147,146 @@ class Order(Base):
     gross_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     discount_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     net_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+
+
+class Channel(Base):
+    """订单来源渠道维度。"""
+
+    __tablename__ = "channels"
+    __table_args__ = ({"comment": "渠道维度：订单来源与投放归因的统一字典"},)
+
+    channel_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    channel_name: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    channel_type: Mapped[str] = mapped_column(String(16), nullable=False)
+
+
+class Promotion(Base):
+    """促销活动维度。"""
+
+    __tablename__ = "promotions"
+    __table_args__ = (
+        CheckConstraint("discount_rate >= 0 AND discount_rate <= 1", name="discount_rate_range"),
+        CheckConstraint("budget_amount >= 0", name="budget_amount_non_negative"),
+        {"comment": "促销活动：用于折扣与销售变化解释"},
+    )
+
+    promotion_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    promotion_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    promotion_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    start_date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), nullable=False)
+    end_date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), nullable=False)
+    discount_rate: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    budget_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+
+
+class OrderOperation(Base):
+    """订单履约事实：渠道、促销、物流与履约状态，一笔订单一行。"""
+
+    __tablename__ = "order_operations"
+    __table_args__ = (
+        CheckConstraint("shipping_fee >= 0", name="shipping_fee_non_negative"),
+        CheckConstraint("delivery_days BETWEEN 1 AND 30", name="delivery_days_range"),
+        {"comment": "订单运营事实：渠道、促销、仓配和物流时效"},
+    )
+
+    order_operation_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    order_no: Mapped[str] = mapped_column(
+        String(24), ForeignKey("orders.order_no"), nullable=False, unique=True, index=True
+    )
+    channel_id: Mapped[str] = mapped_column(String(16), ForeignKey("channels.channel_id"), nullable=False)
+    promotion_id: Mapped[str | None] = mapped_column(
+        String(20), ForeignKey("promotions.promotion_id"), nullable=True
+    )
+    warehouse_province: Mapped[str] = mapped_column(String(32), nullable=False)
+    shipped_date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), nullable=False)
+    delivered_date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), nullable=False)
+    delivery_days: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    shipping_fee: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    fulfillment_status: Mapped[str] = mapped_column(String(16), nullable=False)
+
+
+class InventorySnapshot(Base):
+    """按日历月、SKU、省份记录的库存快照。"""
+
+    __tablename__ = "inventory_snapshots"
+    __table_args__ = (
+        CheckConstraint("opening_stock >= 0", name="opening_stock_non_negative"),
+        CheckConstraint("inbound_qty >= 0", name="inbound_qty_non_negative"),
+        CheckConstraint("sold_qty >= 0", name="sold_qty_non_negative"),
+        CheckConstraint("ending_stock >= 0", name="ending_stock_non_negative"),
+        {"comment": "库存快照：支持库存、缺货和周转分析"},
+    )
+
+    snapshot_date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), primary_key=True)
+    product_id: Mapped[str] = mapped_column(String(12), ForeignKey("products.product_id"), primary_key=True)
+    region_id: Mapped[str] = mapped_column(String(8), ForeignKey("regions.region_id"), primary_key=True)
+    opening_stock: Mapped[int] = mapped_column(Integer, nullable=False)
+    inbound_qty: Mapped[int] = mapped_column(Integer, nullable=False)
+    sold_qty: Mapped[int] = mapped_column(Integer, nullable=False)
+    ending_stock: Mapped[int] = mapped_column(Integer, nullable=False)
+    stockout_flag: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
+class AdCampaign(Base):
+    """广告活动维度。"""
+
+    __tablename__ = "ad_campaigns"
+    __table_args__ = (
+        CheckConstraint("budget_amount >= 0", name="ad_budget_non_negative"),
+        {"comment": "广告活动：用于投放成本和 ROAS 分析"},
+    )
+
+    campaign_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    campaign_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    channel_id: Mapped[str] = mapped_column(String(16), ForeignKey("channels.channel_id"), nullable=False)
+    product_id: Mapped[str | None] = mapped_column(
+        String(12), ForeignKey("products.product_id"), nullable=True
+    )
+    start_date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), nullable=False)
+    end_date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), nullable=False)
+    budget_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+
+
+class AdDailyMetric(Base):
+    """广告活动的日粒度投放表现。"""
+
+    __tablename__ = "ad_daily_metrics"
+    __table_args__ = (
+        CheckConstraint("spend_amount >= 0", name="ad_spend_non_negative"),
+        CheckConstraint("impressions >= 0", name="ad_impressions_non_negative"),
+        CheckConstraint("clicks >= 0", name="ad_clicks_non_negative"),
+        CheckConstraint("conversions >= 0", name="ad_conversions_non_negative"),
+        CheckConstraint("attributed_sales_amount >= 0", name="ad_sales_non_negative"),
+        {"comment": "广告日报：曝光、点击、转化、花费和归因销售额"},
+    )
+
+    campaign_id: Mapped[str] = mapped_column(String(20), ForeignKey("ad_campaigns.campaign_id"), primary_key=True)
+    date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), primary_key=True)
+    spend_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    impressions: Mapped[int] = mapped_column(Integer, nullable=False)
+    clicks: Mapped[int] = mapped_column(Integer, nullable=False)
+    conversions: Mapped[int] = mapped_column(Integer, nullable=False)
+    attributed_sales_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+
+
+class AfterSale(Base):
+    """退款、退货退款与换货记录。"""
+
+    __tablename__ = "after_sales"
+    __table_args__ = (
+        CheckConstraint("refund_amount > 0", name="refund_amount_positive"),
+        {"comment": "售后事实：退款金额、原因和处理状态"},
+    )
+
+    after_sale_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    order_no: Mapped[str] = mapped_column(
+        String(24), ForeignKey("orders.order_no"), nullable=False, unique=True, index=True
+    )
+    after_sale_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    reason: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    refund_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    request_date_id: Mapped[int] = mapped_column(Integer, ForeignKey("date_dim.date_id"), nullable=False)
+    completed_date_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("date_dim.date_id"), nullable=True
+    )

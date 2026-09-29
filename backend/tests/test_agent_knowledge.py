@@ -631,6 +631,7 @@ GOOD_CHART = {
     "title": "销售额趋势",
     "x_field": "month",
     "y_field": "sales_amount",
+    "y_fields": ["sales_amount"],
     "series_field": None,
     "value_format": "currency",
     "reason": "结果包含时间维度和销售额。",

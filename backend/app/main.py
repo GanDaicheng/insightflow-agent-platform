@@ -33,7 +33,7 @@ if _settings.app_mode == APP_MODE_DEMO:
 #
 # 这里**逐个列出**来源，而不是用 ["*"]：
 # 通配符等于允许任意站点带着浏览器里的凭据调用本服务。
-# 同理方法只开 GET/POST/OPTIONS，请求头只开 Content-Type。
+# 同理只开放业务实际使用的 GET/POST/PUT/DELETE/OPTIONS，请求头只开 Content-Type。
 # 这份名单是本地开发用的，生产环境应当由部署配置或受控的允许列表管理，
 # 而不是写死在代码里。
 DEVELOPMENT_ALLOWED_ORIGINS = [
@@ -67,7 +67,7 @@ app.add_middleware(
     allow_origins=DEVELOPMENT_ALLOWED_ORIGINS,
     # 本服务不使用 Cookie / Authorization 凭据，保持 False 最小化暴露面
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
 

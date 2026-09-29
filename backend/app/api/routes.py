@@ -285,12 +285,13 @@ class AgentQueryResultResponse(BaseModel):
 
 
 class AgentChartSuggestionResponse(BaseModel):
-    """图表建议。七个字段全部必填——前端按固定下标取值，不做存在性判断。"""
+    """图表建议。y_field 保留为主指标，y_fields 支持同单位多指标图表。"""
 
     chart_type: Literal["line", "bar", "table", "none"]
     title: str
     x_field: str | None
     y_field: str | None
+    y_fields: list[str] = Field(default_factory=list)
     series_field: str | None
     value_format: Literal["currency", "number", "percent"] | None
     reason: str
@@ -548,7 +549,7 @@ def _to_query_result(raw: object) -> AgentQueryResultResponse | None:
 
 
 def _to_chart_suggestion(raw: object) -> AgentChartSuggestionResponse | None:
-    """图表建议必须七个字段齐全。缺字段就失败，不补默认值。"""
+    """图表建议必须符合公开字段契约，缺少主字段就失败。"""
     if raw is None:
         return None
 

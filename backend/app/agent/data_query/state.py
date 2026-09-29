@@ -98,8 +98,9 @@ class ChartSuggestion(TypedDict):
     chart_type: ChartType
     title: str
     x_field: str | None  # 横轴字段；none / table 时为 None
-    y_field: str | None  # 数值字段；当前只支持一个
-    series_field: str | None  # 分组字段；当前四类意图都不需要分组
+    y_field: str | None  # 主数值字段，兼容单指标前端
+    y_fields: list[str]  # 所有同单位数值字段；y_field 是其中的主指标
+    series_field: str | None  # 分组字段；预留给后续分组图表
     value_format: ValueFormat | None
     reason: str  # 为什么这么建议，用于调试和前端提示
 

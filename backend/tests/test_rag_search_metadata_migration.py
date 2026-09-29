@@ -163,8 +163,8 @@ def test_migration_is_the_single_alembic_head():
 
     # 迁移链：e205344666e8（零售）→ 69e6c2579c1b（知识库）→ 1e96e0de0042（RAG 元数据）
     #        → 20260924ba01（经营分析）→ 20260924ba02（运行标题）
-    #        → bea2b5793f31（天猫 IJCAI 2015）
-    assert list(heads) == ["bea2b5793f31"]
+    #        → bea2b5793f31（天猫 IJCAI 2015）→ 20260929ecom（电商运营扩展）
+    assert list(heads) == ["20260929ecom"]
 
 
 # --------------------------------------------------------------------------

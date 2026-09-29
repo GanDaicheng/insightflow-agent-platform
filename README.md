@@ -208,8 +208,12 @@ Markdown / TXT / DOCX / PDF
 - 找出历史复购率最高的商家，并解释复购率口径。
 - 历史复购、购买广度和训练集标签有什么区别？
 - 为什么结构化数据进入 PostgreSQL，而指标文档进入向量库？
-- 综合分析零售销售表现、会员差异和促销规则，生成经营建议。
+- 综合分析电商公司销售表现、SKU/品类差异和折扣规则，生成商品运营建议。
 - 展示一次问题从领域识别、工具调用、数据查询到最终报告的完整过程。
+
+## 面试演示数据
+
+项目提供独立的 `data_platform_demo` 电商演示库，使用更接近单个公司内部经营分析的合成数据：覆盖 2024—2026 年、省份订单分布、SKU、商品品类、折扣、客户购买频次和季节性。它不会覆盖现有 `data_platform` 基线库。初始化、知识入库、验证和面试问题矩阵见 [零售 Agent 演示数据环境](docs/retail-demo-dataset.md)。
 
 ## 快速启动
 
@@ -438,6 +442,10 @@ docker-compose.yml      PostgreSQL、FastAPI、Next.js 编排，以及一次性 
 ## 详细文档
 
 - [系统架构图与链路说明](docs/architecture.md)
+- [项目价值说明](docs/project-value.md)
+- [云原生演进设计](docs/cloud-native-evolution.md)
+- [Agent 能力证据表](docs/agent-capability-evidence.md)
+- [成本与性能实测报告](docs/performance-cost-report.md)
 - [天猫数据接入运行手册](docs/tmall-data-pipeline-runbook.md)
 - [天猫数据接入面试讲解](docs/tmall-data-pipeline-interview.md)
 - [天猫数据与可询问问题清单](docs/天猫数据导入与可询问问题清单.docx)

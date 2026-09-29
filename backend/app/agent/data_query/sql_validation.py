@@ -49,6 +49,16 @@ _DANGEROUS_NODE_NAMES = {
     "copy": "COPY",
 }
 
+# Keep the Agent-side guard aligned with services.safe_query. Arithmetic and
+# boolean operators are expressions, not callable SQL functions.
+_ALLOWED_FUNCTIONS: tuple[type[exp.Func], ...] = (
+    exp.Count,
+    exp.Sum,
+    exp.Avg,
+    exp.Min,
+    exp.Max,
+)
+
 
 def _statement_label(node: exp.Expression) -> str | None:
     """返回节点的「危险语句名」；安全则返回 None。
@@ -90,6 +100,23 @@ def _dedupe(items: list[str]) -> list[str]:
 def _result(issues: list[str]) -> SqlValidation:
     issues = _dedupe(issues)
     return {"passed": not issues, "issues": issues}
+
+
+def _validate_functions(tree: exp.Expression, issues: list[str]) -> None:
+    for node in tree.walk():
+        if isinstance(node, exp.Binary) and not isinstance(node, (exp.Case, exp.If)):
+            continue
+        if not isinstance(node, exp.Func):
+            continue
+        if isinstance(node, (exp.Case, exp.If)):
+            ancestor = node.parent
+            while ancestor is not None and not isinstance(ancestor, _ALLOWED_FUNCTIONS):
+                ancestor = ancestor.parent
+            if isinstance(ancestor, _ALLOWED_FUNCTIONS):
+                continue
+        if not isinstance(node, _ALLOWED_FUNCTIONS):
+            issues.append("查询使用了不允许的 SQL 函数。")
+            return
 
 
 def validate_sql_draft(
@@ -170,6 +197,8 @@ def validate_sql_draft(
         if isinstance(projection, exp.Column) and projection.name == "*":
             issues.append("禁止使用 SELECT *，请显式列出需要的字段。")
             break
+
+    _validate_functions(tree, issues)
 
     # 11. 表必须来自已匹配的数据集
     allowed_fields = _matched_dataset_fields(matched_assets)

@@ -41,8 +41,8 @@ function ExecutionLog({ events }: { events: string[] }) {
  * 两种形态泾渭分明：
  * - status === "error"：只展示受控的错误说明和执行记录，**不展示结果与图表**。
  *   出错时 State 里可能残留上一次的中间产物，展示出来就是误导。
- * - status === "ok"：按「结论 → 图表/表格 → 来源与行数 → 执行记录 → 知识资料」
- *   的优先级排。用户先要的是答案，再是图，最后才是过程与依据。
+ * - status === "ok"：按「图表 → 关键结论 → 明细 → 执行记录 → 知识资料」
+ *   的优先级排。智能问数首先服务于看数据和做图，经营解释交给 AI 经营分析。
  *   没有查询结果也是正常结果（例如问题不属于问数范畴），照实说明即可，不当成故障。
  */
 export function QueryResultPanel({ result }: Props) {
@@ -65,25 +65,18 @@ export function QueryResultPanel({ result }: Props) {
   const suggestion = result.chart_suggestion;
   // 度量字段与它的展示格式都来自图表建议；表格只对这一列套格式
   const valueField = suggestion?.y_field ?? null;
+  const valueFields = suggestion?.y_fields?.length
+    ? suggestion.y_fields
+    : valueField
+      ? [valueField]
+      : [];
   const valueFormat = suggestion?.value_format ?? null;
   // 后端老版本没有这个字段，缺席时按空数组处理（那一块就不渲染）
   const knowledgeSources = result.knowledge_sources ?? [];
 
   return (
     <div className={styles.page}>
-      {/* 1. 结论 */}
-      <section className={styles.card} aria-labelledby="answer-heading">
-        <h2 id="answer-heading" className={styles.cardTitle}>
-          分析结论
-        </h2>
-        <p className={styles.cardCaption}>
-          以下结论由模型根据查询结果生成，只复述结果里已有的事实。
-        </p>
-        {/* 纯文本渲染：保留换行，但绝不按 HTML / Markdown 执行 */}
-        <p className={styles.answer}>{result.answer}</p>
-      </section>
-
-      {/* 2. 图表或表格 */}
+      {/* 1. 图表或表格：智能问数的主输出 */}
       {queryResult ? (
         <>
           <section className={styles.card} aria-labelledby="chart-heading">
@@ -93,7 +86,7 @@ export function QueryResultPanel({ result }: Props) {
             <ResultChart result={queryResult} suggestion={suggestion} />
           </section>
 
-          {/* 3. 数据来源与结果行数 —— 就放在表格上方，它们是同一件事的元信息 */}
+          {/* 2. 数据来源与结果行数 —— 图表的可核对底稿 */}
           <section className={styles.card} aria-labelledby="table-heading">
             <h2 id="table-heading" className={styles.cardTitle}>
               查询结果
@@ -101,6 +94,7 @@ export function QueryResultPanel({ result }: Props) {
             <ResultTable
               result={queryResult}
               valueField={valueField}
+              valueFields={valueFields}
               valueFormat={valueFormat}
             />
           </section>
@@ -112,6 +106,17 @@ export function QueryResultPanel({ result }: Props) {
           注意「没有结果」不等于「结果为 0」。
         </Notice>
       )}
+
+      {/* 3. 关键结论：只复述查询结果，不承担多步骤原因分析 */}
+      <section className={styles.card} aria-labelledby="answer-heading">
+        <h2 id="answer-heading" className={styles.cardTitle}>
+          关键结论
+        </h2>
+        <p className={styles.cardCaption}>
+          以下内容只根据本次查询结果生成；需要继续追查原因和建议时，请使用 AI 经营分析。
+        </p>
+        <p className={styles.answer}>{result.answer}</p>
+      </section>
 
       {/* 4. 执行记录（可折叠）。没有步骤时整块不渲染，不留一张空卡片 */}
       {result.events.length > 0 ? (

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     default: PLATFORM_NAME,
     template: `%s · ${PLATFORM_NAME}`,
   },
-  description: `${PLATFORM_TAGLINE}。包含知识文档采集与向量检索、基于 LangGraph 的受控智能问数 Agent，以及知识问答与智能问数两个应用。`,
+  description: `${PLATFORM_TAGLINE}。包含知识文档采集与向量检索、基于 LangGraph 的受控智能图表 Agent，以及知识问答与 AI 经营分析两个应用。`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

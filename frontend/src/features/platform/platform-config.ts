@@ -21,10 +21,10 @@ export const PLATFORM_BADGE = "作品集演示 · 多业务可扩展";
  * 演示数据的口径说明。
  *
  * 零售只是当前用来把链路跑通的演示业务，不是这个平台的能力边界。
- * 凡是展示零售样例数据的位置都应该带上这句话。
+ * 凡是展示电商运营样例数据的位置都应该带上这句话。
  */
 export const RETAIL_DATA_NOTE =
-  "当前使用零售样例数据，后续可扩展到其他业务场景。";
+  "当前使用一家电商公司的内部运营样例数据，后续可替换为企业真实数据。";
 
 /**
  * 真实功能页的路径。
@@ -148,13 +148,13 @@ const DATA: PlatformSection = {
       slug: "warehouse",
       name: "数据仓库",
       summary:
-        "PostgreSQL 中的零售样例数据底座，为智能问数与知识问答提供数据基础。",
+        "PostgreSQL 中的电商公司运营数据底座，为智能图表与经营分析提供数据基础。",
       status: "building",
       navHidden: true,
       notice:
-        "这里建的是样例表，不是完整的 ODS / DWD / DWS / ADS 分层数仓——五张表直接建成，没有经过分层加工。",
+        "这里建的是演示用运营表，不是完整的 ODS / DWD / DWS / ADS 分层数仓——核心订单模型和运营事实表直接建成，没有经过分层加工。",
       current: [
-        "PostgreSQL 16 承载四张维度表 + 一张订单事实表，共五张样例表",
+        "PostgreSQL 16 承载订单、SKU、省份、渠道、广告、库存和售后等运营样例表",
         "样例数据由固定种子的生成规则产生，重复执行结果一致",
         "金额口径在数据库层用 CHECK 约束钉死：应收 = 数量 × 单价，实付 = 应收 − 折扣",
         "事实表只存订单明细原始粒度，汇总全部由 SQL 现场计算",
@@ -162,7 +162,7 @@ const DATA: PlatformSection = {
       livePage: {
         href: PAGE_HREFS.dataWarehouse,
         label: "数据仓库",
-        desc: "查看五张样例表的结构、数据规模和它们之间的关系。",
+        desc: "查看运营样例表的结构、数据规模和它们之间的关系。",
       },
     },
   ],
@@ -225,12 +225,12 @@ const AI: PlatformSection = {
         "查询真实 PostgreSQL 样例数据；需要解释口径时检索知识库，检索失败不影响数据结论",
       ],
       dependencies: [
-        "数据服务 + 知识库与 RAG → Agent 中心 → 智能问数应用",
+        "数据服务 + 知识库与 RAG → Agent 中心 → 智能图表应用",
       ],
       livePage: {
         href: PAGE_HREFS.dataQuery,
-        label: "智能问数",
-        desc: "用中文提问，Agent 查询真实样例数据并返回分析结果。",
+        label: "智能图表",
+        desc: "用中文提问，Agent 查询公司运营数据并生成图表。",
       },
     },
   ],
@@ -242,25 +242,26 @@ const APPLICATIONS: PlatformSection = {
   duty: "把数据与 AI 能力交付给业务人员使用",
   status: "done",
   statusNote:
-    "两个应用都已可交互：智能问数查业务数据，知识问答查业务文档。两者都基于本地零售样例数据。",
+    "三个应用都已可交互：智能图表查业务数据，知识问答查业务文档，AI 经营分析负责多步骤诊断。它们共享电商公司运营样例数据。",
   modules: [
     {
       slug: "data-query",
-      name: "智能问数",
-      summary: "用自然语言提问，得到可解释的查询结果与图表建议。",
+      name: "智能图表",
+      summary: "用自然语言查询公司运营数据，自动生成图表和可核对的明细。",
       status: "done",
       notice:
         "尚未接入企业真实生产数据、用户权限与会话记忆；每次提问会调用配置的模型服务。",
       current: [
         "输入中文问题，由后端 Agent 查询真实 PostgreSQL 样例数据",
-        "结果包含分析结论、明细表与图表建议（折线 / 柱状 / 表格）",
+        "优先返回折线图、柱状图或多指标图表，并保留明细表作为底稿",
+        "支持在结果页切换折线图与柱状图，图表字段来自受控配置",
         "口径与归因类问题会附带命中的知识库小节作为解释依据",
         "接口经过安全映射：不返回 SQL、表名字段名、内部状态或异常原文",
       ],
       livePage: {
         href: PAGE_HREFS.dataQuery,
-        label: "智能问数",
-        desc: "用中文提问，Agent 查询真实样例数据并返回分析结果。",
+        label: "智能图表",
+        desc: "用中文提问，Agent 查询公司运营数据并生成图表。",
       },
     },
     {
@@ -274,7 +275,7 @@ const APPLICATIONS: PlatformSection = {
         "用 pgvector 余弦距离检索已入库的知识切片",
         "回答只依据检索到的知识库资料，并附带参考来源",
         "来源含文档、小节、片段位置、原文摘要与相似度",
-        "资料不足时如实说明，不编造；与智能问数是两条独立链路",
+        "资料不足时如实说明，不编造；与智能图表是两条独立链路",
       ],
       livePage: {
         href: PAGE_HREFS.knowledgeQa,
@@ -288,7 +289,7 @@ const APPLICATIONS: PlatformSection = {
       summary: "由主管 Agent 多轮调用问数和知识库工具，生成带证据的经营分析报告。",
       status: "building",
       notice:
-        "当前使用零售样例数据和匿名浏览器会话；企业登录、租户隔离与生产数据权限尚未接入。",
+        "当前使用电商公司运营样例数据和匿名浏览器会话；企业登录、租户隔离与生产数据权限尚未接入。",
       workflow: [
         "理解经营目标",
         "动态调用数据分析工具",
@@ -298,17 +299,17 @@ const APPLICATIONS: PlatformSection = {
       ],
       current: [
         "基于 Deep Agents 的主管 Agent",
-        "复用现有智能问数 LangGraph 和 RAG 工具",
+        "复用现有智能图表 LangGraph 和 RAG 工具",
         "通过 SSE 实时展示工具调用与报告生成过程",
         "支持线程状态恢复和匿名用户偏好记忆",
       ],
       dependencies: [
-        "智能问数 + 知识库与 RAG → Deep Agents 主管 → AI 经营分析应用",
+        "智能图表 + 知识库与 RAG → Deep Agents 主管 → AI 经营分析应用",
       ],
       livePage: {
         href: PAGE_HREFS.businessAnalysis,
         label: "AI 经营分析",
-        desc: "让主管 Agent 多步分析销售、会员、品类和业务规则。",
+        desc: "让主管 Agent 多步分析销售、商品、渠道和业务规则。",
       },
     },
   ],

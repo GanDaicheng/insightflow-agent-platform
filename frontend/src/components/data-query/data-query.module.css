@@ -325,6 +325,61 @@
   font-weight: var(--weight-semibold);
 }
 
+.chartHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.chartControls {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+}
+
+.chartControl {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.chartControl[data-active="true"] {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
 .chartReason {
   margin: 0 0 var(--space-4);
   font-size: var(--text-xs);
@@ -374,6 +429,17 @@
   list-style: none;
 }
 
+.barSeries + .barSeries {
+  margin-top: var(--space-4);
+}
+
+.barSeriesTitle {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+}
+
 .barRow {
   display: grid;
   grid-template-columns: minmax(72px, 168px) minmax(0, 1fr) auto;
@@ -410,6 +476,10 @@
 }
 
 @media (max-width: 720px) {
+  .chartHeader {
+    flex-direction: column;
+  }
+
   .exampleGroups {
     grid-template-columns: 1fr;
   }

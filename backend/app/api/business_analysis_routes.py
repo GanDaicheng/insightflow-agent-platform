@@ -16,7 +16,11 @@ from app.agent.business_analysis.memory import (
 )
 from app.agent.business_analysis.schemas import AnalysisEvent, BusinessAnalysisRequest
 from app.repositories.database import get_engine
-from app.services.analysis_report import load_thread_runs, load_user_threads
+from app.services.analysis_report import (
+    delete_user_thread,
+    load_thread_runs,
+    load_user_threads,
+)
 from app.services.business_analysis_runner import (
     BusinessAnalysisBusyError,
     is_thread_busy,
@@ -105,6 +109,19 @@ async def business_analysis_thread_history(thread_id: str) -> list[dict[str, obj
     if not thread_id.strip() or len(thread_id) > 128:
         raise HTTPException(status_code=422, detail="thread_id 不合法。")
     return await load_thread_history(thread_id)
+
+
+@router.delete("/api/v1/agent/business-analysis/threads/{thread_id}", status_code=204)
+async def delete_business_analysis_thread(thread_id: str, user_id: str) -> Response:
+    if not thread_id.strip() or len(thread_id) > 128:
+        raise HTTPException(status_code=422, detail="thread_id 不合法。")
+    if not user_id.strip() or len(user_id) > 128:
+        raise HTTPException(status_code=422, detail="user_id 不合法。")
+    if is_thread_busy(thread_id):
+        raise HTTPException(status_code=409, detail="该分析会话正在运行，暂时不能删除。")
+    async with get_engine().begin() as connection:
+        await delete_user_thread(connection, thread_id=thread_id, user_id=user_id)
+    return Response(status_code=204)
 
 
 @router.get("/api/v1/agent/business-analysis/preferences/{user_id}")

@@ -53,8 +53,8 @@ export function QuestionInput({
         输入问题
       </h2>
       <p className={styles.cardCaption}>
-        用一句中文描述想看的分析，例如趋势、排行、区域对比或会员复购。
-        样例数据覆盖 2025 全年，问题里写明具体的年月更容易得到结果。
+        用一句中文描述想看的数据，例如销售趋势、SKU 排名、渠道对比、广告或库存表现。
+        页面会优先生成图表，并保留明细作为核对底稿。
       </p>
 
       <label className={styles.hint} htmlFor="question-input">

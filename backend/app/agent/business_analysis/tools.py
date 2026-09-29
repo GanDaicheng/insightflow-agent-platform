@@ -80,9 +80,14 @@ async def analyze_business_data(question: str) -> dict[str, Any]:
         sources = []
 
     if not isinstance(answer, str) or not answer.strip():
+        controlled_error = state.get("error") if isinstance(state, dict) else None
         return ToolResult(
             status="error",
-            summary="数据分析未生成可展示的结论。",
+            summary=(
+                controlled_error.strip()
+                if isinstance(controlled_error, str) and controlled_error.strip()
+                else "数据分析未生成可展示的结论。"
+            ),
         ).model_dump()
 
     return ToolResult(

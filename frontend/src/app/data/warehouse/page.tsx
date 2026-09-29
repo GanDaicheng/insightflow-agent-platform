@@ -20,7 +20,7 @@ const MODULE_SLUG = "warehouse";
 export const metadata: Metadata = {
   title: "数据仓库",
   description:
-    "PostgreSQL 中的零售样例数据底座：四张维度表与一张订单事实表，为智能问数和知识问答提供数据基础。",
+    "PostgreSQL 中的电商公司运营数据底座：订单、SKU、渠道、广告、库存和售后数据，为智能图表和经营分析提供基础。",
 };
 
 /**
@@ -42,7 +42,7 @@ export default function Page() {
       <PageHeader
         sectionName={section?.name ?? "数据中台"}
         title="数据仓库"
-        subtitle="PostgreSQL 中的零售样例数据底座。四张维度表描述「谁、什么商品、哪里、什么时候」，一张订单事实表记录交易明细，智能问数的查询就落在这些表上。"
+        subtitle="PostgreSQL 中的电商公司运营数据底座。核心订单星型模型连接客户、SKU、省份和日期，并扩展渠道、促销、广告、库存、物流和售后事实，智能图表和经营分析都从这些表取数。"
         boundary={
           <>
             <p>{RETAIL_DATA_NOTE}</p>
@@ -62,14 +62,14 @@ export default function Page() {
         </p>
         <p className={styles.blockText}>
           事实表只保存订单明细的原始粒度，不存任何预聚合结果——
-          月度、区域、商品、会员等级的汇总全部由 SQL 现场算出来，
+          月度、省份、SKU、渠道和品类的汇总全部由 SQL 现场算出来，
           这样数据才算「可真实分析」，而不是读一份别人算好的答案。
         </p>
       </section>
 
       <section className={styles.block}>
         <div className={styles.blockHead}>
-          <h2 className={styles.blockTitle}>五张样例表</h2>
+          <h2 className={styles.blockTitle}>12 张运营样例表</h2>
           <p className={styles.blockNote}>
             行数为实测值，写在前端静态配置里，不是实时统计。
           </p>
@@ -110,7 +110,7 @@ export default function Page() {
         <div className={styles.blockHead}>
           <h2 className={styles.blockTitle}>表之间的关系</h2>
           <p className={styles.blockNote}>
-            四条关联都是「事实表 → 维度表」的外键，方向一致。
+            核心订单模型通过外键连接客户、SKU、省份和日期；运营事实表继续关联渠道、促销、广告、库存和售后。
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export default function Page() {
         <h2 className={styles.blockTitle}>用这些数据能做什么</h2>
         <p className={styles.blockText}>
           口径与规则类问题（「客单价怎么算」）去知识问答；
-          数值类问题（「2025 年各月销售额趋势」）去智能问数，由 Agent 生成 SQL 在真实数据上计算。
+          数值类问题（「2025 年每月销售额和毛利趋势」）去智能图表，由 Agent 生成 SQL 在真实数据上计算。
         </p>
 
         <div className={styles.actions}>
@@ -129,7 +129,7 @@ export default function Page() {
             基于数据口径提问
           </LinkButton>
           <LinkButton href={PAGE_HREFS.dataQuery}>
-            使用智能问数
+            使用智能图表
           </LinkButton>
         </div>
       </section>
@@ -137,7 +137,7 @@ export default function Page() {
       <div className={styles.noticeWrap}>
         <Notice tone="info" tag="演示数据">
           {RETAIL_DATA_NOTE}
-          这五张表是为把「问数」这条链路真正跑通而准备的样例数据，
+          这 12 张表是为把「自然语言取数 → 图表 → 经营分析」链路真正跑通而准备的样例数据，
           不代表真实生产数据，也没有声称已经完成 ODS / DWD / DWS / ADS 分层建模。
         </Notice>
       </div>

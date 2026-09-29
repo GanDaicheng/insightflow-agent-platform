@@ -4,8 +4,8 @@
 
 项目里现在有两套完全独立的数据：
 
-- **零售样例数仓**（orders / customers / products / regions / date_dim），
-  2025 年全年，带金额、数量、区域、会员等级；
+- **电商经营数仓**（订单、商品、渠道、促销、履约、库存、广告与售后等表），
+  演示库覆盖 2024—2026 年；基线库仍保留原有小规模样例；
 - **天猫 IJCAI 2015 数据集**（tmall_*），2014 年 5~11 月，只有行为日志，
   没有价格、订单号、数量、商品名。
 
@@ -36,9 +36,12 @@ from typing import Final
 DOMAIN_RETAIL: Final[str] = "retail"
 DOMAIN_TMALL: Final[str] = "tmall"
 
-# 零售领域：五张表全部可查。
+# 零售领域：基础事实表与运营扩展表全部登记，具体字段仍由 safe_query 逐列白名单控制。
 RETAIL_TABLES: Final[frozenset[str]] = frozenset(
-    {"customers", "products", "regions", "date_dim", "orders"}
+    {
+        "customers", "products", "regions", "date_dim", "orders", "channels", "promotions",
+        "order_operations", "inventory_snapshots", "ad_campaigns", "ad_daily_metrics", "after_sales",
+    }
 )
 
 # 天猫领域的**全部**物理表。包含明细表，因为跨领域检查要能认出

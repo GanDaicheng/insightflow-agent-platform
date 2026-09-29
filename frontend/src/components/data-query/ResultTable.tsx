@@ -6,11 +6,11 @@ import styles from "./data-query.module.css";
 type Props = {
   result: QueryResult;
   /**
-   * 度量字段（图表建议里的 y_field）。
-   * 只有这一列按 value_format 格式化——把「金额格式」套到月份列上，
-   * 会渲染出「¥1.00」这种荒唐的单元格。
+   * 度量字段（图表建议里的 y_field）。兼容单指标调用方。
    */
   valueField: string | null;
+  /** 同单位多指标图表对应的所有数值列。 */
+  valueFields?: string[];
   valueFormat: ValueFormat | null;
 };
 
@@ -20,8 +20,10 @@ type Props = {
  * 表格永远渲染后端给的行，不排序、不聚合、不改数——它就是「模型看到了什么」的底稿。
  * 单元格一律按纯文本渲染，因此结果里就算混进 <script> 也只会原样显示成字符。
  */
-export function ResultTable({ result, valueField, valueFormat }: Props) {
+export function ResultTable({ result, valueField, valueFields = [], valueFormat }: Props) {
   const { columns, rows, row_count, source } = result;
+
+  const formattedFields = new Set(valueFields.length > 0 ? valueFields : valueField ? [valueField] : []);
 
   return (
     <div>
@@ -30,7 +32,7 @@ export function ResultTable({ result, valueField, valueFormat }: Props) {
         <span className={styles.sourceTag} data-source={source}>
           {source === "mock"
             ? "模拟数据 · 演示结果，不是真实查询"
-            : "数据来源：PostgreSQL 零售样例数据"}
+            : "数据来源：PostgreSQL 电商运营样例数据"}
         </span>
       </div>
 
@@ -59,12 +61,12 @@ export function ResultTable({ result, valueField, valueFormat }: Props) {
                     <td
                       key={column}
                       className={
-                        column === valueField ? styles.numeric : undefined
+                        formattedFields.has(column) ? styles.numeric : undefined
                       }
                     >
                       {formatValue(
                         row[column],
-                        column === valueField ? valueFormat : null,
+                        formattedFields.has(column) ? valueFormat : null,
                       )}
                     </td>
                   ))}

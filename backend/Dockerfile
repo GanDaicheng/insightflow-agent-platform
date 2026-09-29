@@ -39,6 +39,7 @@ COPY backend/alembic ./alembic
 COPY backend/alembic.ini ./alembic.ini
 COPY backend/scripts ./scripts
 COPY backend/knowledge_seed ./knowledge_seed
+COPY backend/knowledge_seed_demo ./knowledge_seed_demo
 
 EXPOSE 8000
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { parseSseChunk, runBusinessAnalysis } from "./business-analysis";
+import { deleteAnalysisThread, parseSseChunk, runBusinessAnalysis } from "./business-analysis";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -46,5 +46,23 @@ describe("parseSseChunk", () => {
       type: "error",
       error_code: "AGENT_CONFIGURATION_ERROR",
     });
+  });
+});
+
+describe("deleteAnalysisThread", () => {
+  it("deletes one thread for the current user", async () => {
+    vi.stubGlobal("window", {
+      location: { protocol: "http:", hostname: "localhost" },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await deleteAnalysisThread("thread/1", "user-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/agent/business-analysis/threads/thread%2F1"),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    expect(fetchMock.mock.calls[0][0]).toContain("user_id=user-1");
   });
 });

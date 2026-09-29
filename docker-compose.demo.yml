@@ -1,0 +1,17 @@
+# 独立演示环境覆盖层：基础 postgres 容器不变，只把后端和 init 指向
+# data_platform_demo。使用前先执行 prepare_demo_database.py 创建数据库。
+services:
+  init:
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://data_platform:data_platform_dev@postgres:5432/data_platform_demo"
+    command:
+      - sh
+      - -c
+      - >-
+        python -m alembic -c /app/alembic.ini upgrade head &&
+        python scripts/seed_retail_demo_data.py --database-url "$${DATABASE_URL}" &&
+        python scripts/ingest_knowledge.py /app/knowledge_seed_demo
+
+  backend:
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://data_platform:data_platform_dev@postgres:5432/data_platform_demo"

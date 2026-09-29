@@ -11,6 +11,7 @@ type Props = {
   busy?: boolean;
   onNew: () => void;
   onSelect: (thread: Thread) => void;
+  onDelete: (thread: Thread) => void;
   footer?: ReactNode;
 };
 
@@ -20,6 +21,7 @@ export function AnalysisThreadList({
   busy = false,
   onNew,
   onSelect,
+  onDelete,
   footer,
 }: Props) {
   return (
@@ -33,7 +35,7 @@ export function AnalysisThreadList({
       ) : (
         <ul className={styles.threadList}>
           {threads.map((thread) => (
-            <li key={thread.id}>
+            <li key={thread.id} className={styles.threadItem}>
               <button
                 type="button"
                 className={thread.id === activeId ? styles.activeThread : styles.thread}
@@ -43,6 +45,19 @@ export function AnalysisThreadList({
               >
                 <span>{thread.title}</span>
                 <small>{thread.updatedAt}</small>
+              </button>
+              <button
+                type="button"
+                className={styles.deleteThread}
+                aria-label={`删除会话：${thread.title}`}
+                title="删除会话"
+                disabled={busy}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete(thread);
+                }}
+              >
+                ×
               </button>
             </li>
           ))}

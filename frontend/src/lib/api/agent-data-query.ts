@@ -42,6 +42,8 @@ export type ChartSuggestion = {
   title: string;
   x_field: string | null;
   y_field: string | null;
+  /** 同一纵轴上可安全比较的指标；y_field 是主指标。 */
+  y_fields: string[];
   series_field: string | null;
   value_format: ValueFormat | null;
   reason: string;
@@ -146,6 +148,8 @@ function isChartSuggestion(value: unknown): value is ChartSuggestion {
     typeof value.title === "string" &&
     isNullableString(value.x_field) &&
     isNullableString(value.y_field) &&
+    Array.isArray(value.y_fields) &&
+    value.y_fields.every((field) => typeof field === "string") &&
     isNullableString(value.series_field) &&
     (value.value_format === null || isValueFormat(value.value_format)) &&
     typeof value.reason === "string"

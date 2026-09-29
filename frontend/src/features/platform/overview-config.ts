@@ -31,14 +31,14 @@ import {
 export const OVERVIEW_HERO = {
   title: PLATFORM_NAME,
   subtitle:
-    "从业务文档与数据资产出发，通过 RAG、LangGraph 和 Deep Agents，交付可解释的知识问答、智能问数与经营分析。",
+    "从业务文档与数据资产出发，通过 RAG、LangGraph 和 Deep Agents，交付可解释的知识问答、智能图表与经营分析。",
   /**
    * 三个能力标签，对应下面三张业务卡片。
    * 用各业务页自己的标题，不另起短名——首页上同一件事只该有一个叫法。
    */
   tags: [
     "RAG知识问答",
-    "基于RAG的智能问数Agent",
+    "自然语言智能图表 Agent",
     "AI经营分析助手",
   ],
   note: RETAIL_DATA_NOTE,
@@ -64,7 +64,7 @@ export const OVERVIEW_PIPELINE: PipelineNode[] = [
   {
     id: "input",
     name: "业务文档 / 业务数据",
-    role: "平台的两种输入：非结构化的知识文档，以及结构化的零售样例数据。",
+    role: "平台的两种输入：非结构化的知识文档，以及结构化的电商公司运营数据。",
     tech: "md / txt / docx / pdf · PostgreSQL 星型模型",
   },
   {
@@ -89,11 +89,11 @@ export const OVERVIEW_PIPELINE: PipelineNode[] = [
     role: "用状态图与主管 Agent 组织任务，生成的 SQL 经语法树校验后才落到只读查询。",
     tech: "LangGraph · Deep Agents · sqlglot AST · 只读事务",
     href: PAGE_HREFS.dataQuery,
-    hrefLabel: "进入智能问数",
+    hrefLabel: "进入智能图表",
   },
   {
     id: "applications",
-    name: "RAG知识问答 · 基于RAG的智能问数Agent · AI经营分析助手",
+    name: "RAG知识问答 · 自然语言智能图表 Agent · AI经营分析助手",
     role: "三个业务入口，分别面向文档知识、结构化数据和复杂的经营目标。",
     tech: "带来源回答 · NL2SQL · 多轮 Agent 分析",
     href: PAGE_HREFS.businessAnalysis,
@@ -126,8 +126,8 @@ export type ApplicationEntry = {
  *
  * 顺序按「先有知识底座、再有两条问答链路、最后是多步 Agent」排列。
  * 名称一律用**各业务页自己的标题**（数据采集 / RAG知识问答 /
- * 基于RAG的智能问数Agent / AI经营分析助手），与左侧导航的短名
- * （数据采集 / 知识问答 / 智能问数 / AI 经营分析）不同——
+ * 自然语言智能图表 Agent / AI经营分析助手），与左侧导航的短名
+ * （数据采集 / 知识问答 / 智能图表 / AI 经营分析）不同——
  * 导航求短，卡片求准，同一功能点开后看到的名字应该和卡片上写的一致。
  */
 export const OVERVIEW_APPLICATIONS: ApplicationEntry[] = [
@@ -162,7 +162,7 @@ export const OVERVIEW_APPLICATIONS: ApplicationEntry[] = [
   },
   {
     id: "data-query",
-    name: "基于RAG的智能问数Agent",
+    name: "自然语言智能图表 Agent",
     problem: "业务人员不会写 SQL，取数要排队等数据团队，口径还容易对不齐。",
     input: "自然语言业务问题",
     process: [
@@ -173,7 +173,7 @@ export const OVERVIEW_APPLICATIONS: ApplicationEntry[] = [
       "sqlglot AST 安全校验，失败时最多自动修复一次",
       "在只读事务中查询 PostgreSQL",
     ],
-    output: "分析结论、结果表格与图表建议，需要解释口径时附知识库来源",
+    output: "图表、结果表格和简短数据结论，需要解释口径时附知识库来源",
     href: PAGE_HREFS.dataQuery,
   },
   {
@@ -183,7 +183,7 @@ export const OVERVIEW_APPLICATIONS: ApplicationEntry[] = [
     input: "一句话的经营分析目标",
     process: [
       "Deep Agents 主管 Agent 拆解目标",
-      "调用智能问数 LangGraph 工具取数",
+      "调用智能图表 LangGraph 工具取数",
       "调用 RAG 知识工具检索业务规则",
       "Agent Loop 多轮分析、按异常继续下钻",
       "PostgreSQL Checkpoint / Store 保存运行状态与偏好",
@@ -284,11 +284,11 @@ export const INTERVIEW_HIGHLIGHTS: InterviewHighlight[] = [
  * 超过三条就会跑到画布外面去。
  */
 export const PROJECT_BOUNDARY_INTRO =
-  "当前为零售样例业务，不代表平台只能服务零售场景。以下是这个作品集版本的真实边界，也是继续工程化时优先补齐的部分。";
+  "当前为一家电商公司的运营样例，不代表平台只能服务电商场景。以下是这个作品集版本的真实边界，也是继续工程化时优先补齐的部分。";
 
 export const PROJECT_BOUNDARY_ITEMS: string[] = [
   ...ARCHITECTURE_MODEL.boundaries,
-  "企业真实生产数据尚未接入，当前所有结论都基于零售样例数据。",
+  "企业真实生产数据尚未接入，当前所有结论都基于电商公司运营样例数据。",
   "RAG 检索质量的人工评测与反馈闭环尚未建立，检索效果目前只能靠人工试问判断。",
   "多轮会话上下文与跨会话记忆能力仍然有限，经营分析之外的场景每次提问相互独立。",
 ];
