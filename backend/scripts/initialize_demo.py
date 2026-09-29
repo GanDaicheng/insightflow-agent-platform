@@ -33,8 +33,7 @@ alembic/env.py 内部调用 asyncio.run() 来跑异步迁移。asyncio.run() 不
     skip          明确跳过知识库，适用于无 Key 的基础环境。
     required      缺配置或导入失败都返回非 0 退出码，适用于真实模式与严格部署检查。
 
-Tmall 原始数据（zip / 事件明细）**不在这里导入**：它需要用户自备外部大文件，
-不属于「干净环境可复现」的范围，仍由 scripts/ingest_tmall_data.py 手工执行。
+初始化只处理仓库内的电商经营种子数据和知识文档，不依赖外部 CSV、ZIP 或公开数据集。
 """
 
 from __future__ import annotations

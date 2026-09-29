@@ -367,6 +367,9 @@ METRICS: tuple[MetricSpec, ...] = (
     },
 )
 
+# 天猫资产保留在历史代码中供迁移兼容，但不再进入当前运行时目录。
+METRICS = tuple(metric for metric in METRICS if metric["domain"] == DOMAIN_RETAIL)
+
 
 # --------------------------------------------------------------------------
 # 数据集目录
@@ -804,6 +807,9 @@ DATASETS: tuple[DatasetSpec, ...] = (
         ),
     },
 )
+
+# 当前产品只暴露电商经营数据；历史天猫资产不参与默认查询。
+DATASETS = tuple(dataset for dataset in DATASETS if dataset["domain"] == DOMAIN_RETAIL)
 
 
 # --------------------------------------------------------------------------

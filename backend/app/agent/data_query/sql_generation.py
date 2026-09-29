@@ -15,8 +15,6 @@
 本模块只负责前两层——它的产物叫「草稿」，不叫「可执行 SQL」。
 """
 
-import re
-from datetime import date
 from typing import Literal
 
 from langchain_core.language_models import BaseChatModel
@@ -84,75 +82,6 @@ class SqlDraft(BaseModel):
 
     sql: str = Field(description=f"一条 PostgreSQL SELECT 语句，必须带不超过 {MAX_SQL_LIMIT} 的 LIMIT")
     reasoning: str = Field(description="简短中文说明选用了哪些资产和维度")
-
-
-_ISO_DATE_RE = re.compile(r"\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b")
-_CHINESE_DATE_RE = re.compile(r"(20\d{2})年(\d{1,2})月(\d{1,2})日?")
-_SHORT_CHINESE_DATE_RE = re.compile(r"(?<!\d)(\d{1,2})月(\d{1,2})日?")
-
-
-def _normalize_date(year: str, month: str, day: str) -> str:
-    """Validate a user-provided calendar date and render one SQL-safe literal."""
-    value = date(int(year), int(month), int(day))
-    return value.isoformat()
-
-
-def _tmall_trend_date_range(question: str) -> tuple[str, str]:
-    """Extract a bounded date range for the Tmall daily trend query.
-
-    The source data has a fixed 2014 date domain.  When a user says "双十一前后"
-    without spelling out dates, use the useful 11/1--11/12 window rather than
-    asking the LLM to invent a date function.  Explicit dates always win.
-    """
-    full_dates = [
-        _normalize_date(year, month, day)
-        for year, month, day in _ISO_DATE_RE.findall(question)
-    ]
-    if not full_dates:
-        full_dates = [
-            _normalize_date(year, month, day)
-            for year, month, day in _CHINESE_DATE_RE.findall(question)
-        ]
-
-    if len(full_dates) >= 2:
-        return full_dates[0], full_dates[1]
-    if len(full_dates) == 1:
-        short_dates = _SHORT_CHINESE_DATE_RE.findall(question)
-        if short_dates:
-            year = full_dates[0][:4]
-            second = _normalize_date(year, short_dates[0][0], short_dates[0][1])
-            return full_dates[0], second
-
-    if "双十一" in question or "双 11" in question or "双11" in question:
-        return "2014-11-01", "2014-11-12"
-    return "2014-05-11", "2014-11-12"
-
-
-def build_tmall_daily_trend_draft(
-    question: str,
-    intent: str,
-    matched_assets: list[MatchedAsset] | None,
-) -> SqlDraft:
-    """Build a bounded daily Tmall trend query without model-generated date functions."""
-    start_date, end_date = _tmall_trend_date_range(question)
-    table = "tmall_daily_metrics"
-    sql = (
-        "SELECT "
-        f"{table}.metric_date, "
-        f"SUM(CASE WHEN {table}.action_type = 'click' THEN {table}.event_count ELSE 0 END) AS click_event_count, "
-        f"SUM(CASE WHEN {table}.action_type = 'click' THEN {table}.user_count ELSE 0 END) AS click_user_count, "
-        f"SUM(CASE WHEN {table}.action_type = 'buy' THEN {table}.event_count ELSE 0 END) AS buy_event_count, "
-        f"SUM(CASE WHEN {table}.action_type = 'buy' THEN {table}.user_count ELSE 0 END) AS buy_user_count "
-        f"FROM {table} "
-        f"WHERE {table}.metric_date BETWEEN '{start_date}' AND '{end_date}' "
-        f"GROUP BY {table}.metric_date "
-        f"ORDER BY {table}.metric_date "
-        "LIMIT 200"
-    )
-    return SqlDraft(
-        sql=sql,
-        reasoning="使用天猫每日行为汇总，按日期并列汇总点击与购买的行为记录数和去重用户数。",
-    )
 
 
 def describe_assets(matched_assets: list[MatchedAsset] | None) -> str:

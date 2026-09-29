@@ -1,6 +1,6 @@
 # InsightFlow 系统架构
 
-InsightFlow 是一个面向零售与天猫数据的智能经营分析平台。它把自然语言问数、业务知识检索和多步骤经营分析组织在同一套数据与 Agent 基础设施上。
+InsightFlow 是一个面向单个电商公司的智能经营分析平台。它把自然语言问数、业务知识检索和多步骤经营分析组织在同一套数据与 Agent 基础设施上。
 
 本文只描述当前仓库已经实现的能力；Kubernetes、弹性伸缩、企业身份认证、多租户和生产级监控属于后续演进方向。
 
@@ -24,7 +24,7 @@ flowchart TB
     subgraph DATA[数据与状态层]
         PG[(PostgreSQL 16)]
         VEC[(pgvector\n知识向量)]
-        BIZ[业务数据\n零售 / 天猫 Gold 数据]
+        BIZ[电商公司经营数据\n订单 / SKU / 渠道 / 履约 / 售后]
         KNOW[知识文档与切片\n来源 / 章节 / 元数据]
         STATE[Checkpoint / Store\n线程状态 / 偏好 / 报告]
     end

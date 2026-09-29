@@ -67,7 +67,6 @@ from app.agent.data_query.result_explanation import (
     with_source_note,
 )
 from app.agent.data_query.sql_generation import (
-    build_tmall_daily_trend_draft,
     SqlDraft,
     generate_sql_draft,
     repair_sql_draft,
@@ -256,15 +255,7 @@ def generate_sql(
     question = (state.get("question") or "").strip()
 
     try:
-        has_tmall_daily_dataset = any(
-            asset.get("kind") == "dataset"
-            and asset.get("name") == "tmall_daily_metrics"
-            for asset in matched_assets
-        )
-        if intent == "trend" and has_tmall_daily_dataset:
-            raw = build_tmall_daily_trend_draft(question, intent, matched_assets)
-        else:
-            raw = sql_generator(question, intent, matched_assets)
+        raw = sql_generator(question, intent, matched_assets)
         # 和 understand_question 一样，不信任返回值，重新校验一遍。
         payload = raw.model_dump() if isinstance(raw, BaseModel) else raw
         draft = SqlDraft.model_validate(payload)
@@ -819,10 +810,7 @@ def discover_assets(state: DataQueryState) -> dict:
 
     question = (state.get("question") or "").strip()
 
-    # 领域路由放在检索**之前**：两个领域的资产绝不能同时出现在 matched_assets 里，
-    # 否则模型就有机会写出 `orders JOIN tmall_user_metrics` 这种
-    # 语法合法、数字荒谬、还不会报错的 SQL。检索阶段就过滤掉，
-    # 比等到 SQL 校验再拦要早得多，也便宜得多。
+    # 领域路由放在检索之前，确保 Agent 只看到当前电商经营数据域的资产。
     routing = route_domain(question)
 
     metrics = search_metrics.invoke({"query": question})

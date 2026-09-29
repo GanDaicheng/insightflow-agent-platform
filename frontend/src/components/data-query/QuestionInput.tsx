@@ -3,6 +3,7 @@ import type { KeyboardEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { QUESTION_MAX_LENGTH } from "@/lib/api/agent-data-query";
 
+import type { ExampleGroup, ExampleItem } from "../../app/applications/data-query/examples";
 import styles from "./data-query.module.css";
 
 type Props = {
@@ -13,11 +14,6 @@ type Props = {
   /** 请求进行中：输入框与所有按钮都不可用，避免重复提交。 */
   busy: boolean;
   examples: readonly ExampleGroup[];
-};
-
-export type ExampleGroup = {
-  label: string;
-  items: readonly string[];
 };
 
 /**
@@ -50,12 +46,23 @@ export function QuestionInput({
   return (
     <section className={styles.card} aria-labelledby="question-heading">
       <h2 id="question-heading" className={styles.cardTitle}>
-        输入问题
+        你现在最想看清哪个运营问题？
       </h2>
       <p className={styles.cardCaption}>
-        用一句中文描述想看的数据，例如销售趋势、SKU 排名、渠道对比、广告或库存表现。
-        页面会优先生成图表，并保留明细作为核对底稿。
+        用一句中文描述目标，Agent 会选择数据工具，优先生成图表，并保留明细作为核对底稿。
       </p>
+
+      <div className={styles.promise} aria-label="问数结果说明">
+        <div>
+          <span className={styles.promiseKicker}>你会得到</span>
+          <strong>一张可解释的运营图表</strong>
+        </div>
+        <span className={styles.promiseArrow} aria-hidden="true">→</span>
+        <div>
+          <span className={styles.promiseKicker}>同时保留</span>
+          <strong>数据明细与查询依据</strong>
+        </div>
+      </div>
 
       <label className={styles.hint} htmlFor="question-input">
         自然语言问题
@@ -100,16 +107,29 @@ export function QuestionInput({
       </div>
 
       <div className={styles.examples}>
-        <p className={styles.examplesLabel}>示例问题（点击只填入输入框，不会自动提交）</p>
+        <div className={styles.examplesIntro}>
+          <p className={styles.examplesLabel}>从一个真实的运营动作开始</p>
+          <span>点击问题只填入输入框，不会自动提交</span>
+        </div>
         <div className={styles.exampleGroups}>
           {examples.map((group) => (
             <section key={group.label} className={styles.exampleGroup} aria-labelledby={`dq-example-${group.label}`}>
-              <h3 id={`dq-example-${group.label}`} className={styles.exampleGroupTitle}>{group.label}</h3>
+              <div className={styles.exampleGroupHead}>
+                <div>
+                  <h3 id={`dq-example-${group.label}`} className={styles.exampleGroupTitle}>{group.label}</h3>
+                  <p className={styles.exampleGroupDescription}>{group.description}</p>
+                </div>
+                <span className={styles.groupIndex}>{String(examples.indexOf(group) + 1).padStart(2, "0")}</span>
+              </div>
               <ul className={styles.exampleList}>
-                {group.items.map((example) => (
-                  <li key={example}>
-                    <button type="button" className={styles.example} onClick={() => onChange(example)} disabled={busy}>
-                      {example}
+                {group.items.map((example: ExampleItem) => (
+                  <li key={example.id}>
+                    <button type="button" className={styles.example} onClick={() => onChange(example.question)} disabled={busy}>
+                      <span className={styles.exampleQuestion}>{example.question}</span>
+                      <span className={styles.exampleMeta}>
+                        <span>{example.context}</span>
+                        <span className={styles.exampleChart} data-chart={example.chartLabel}>{example.chartLabel}</span>
+                      </span>
                     </button>
                   </li>
                 ))}

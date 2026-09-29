@@ -128,7 +128,7 @@ QUESTION = "华东地区近六个月销售额趋势怎么样"
 CATALOG_METRIC_NAMES = {m["name"] for m in METRICS}
 CATALOG_DATASET_NAMES = {d["name"] for d in DATASETS}
 
-ALLOWED_INTENTS = {"trend", "ranking", "breakdown", "repurchase", "funnel", "unknown"}
+ALLOWED_INTENTS = {"trend", "ranking", "breakdown", "repurchase", "unknown"}
 
 # 一条「完全合规」的 PostgreSQL SELECT：用满了趋势问题匹配到的四张表/指标，
 # 字段全部带表名，带 LIMIT 200。安全测试都拿它当对照组。
@@ -1150,16 +1150,8 @@ def test_catalog_entries_declare_required_fields():
 
 
 def test_catalog_covers_the_agreed_metrics_and_datasets():
-    """两个领域的资产都在目录里，而且各自只登记该领域的表。
-
-    天猫那半边**只有六张 Gold 汇总表**：明细表（tmall_users /
-    tmall_user_events / tmall_repurchase_samples）刻意不登记，
-    因为它们不在 safe_query 的白名单里——登记了只会让模型生成
-    必然被拒的 SQL，而且会把「大模型能不能扫用户级明细」这个
-    本该在表这一层回答的问题重新打开。
-    """
+    """当前目录只登记电商公司经营分析所需的指标和数据集。"""
     assert CATALOG_METRIC_NAMES == {
-        # 零售
         "sales_amount",
         "order_count",
         "average_order_value",
@@ -1171,23 +1163,8 @@ def test_catalog_covers_the_agreed_metrics_and_datasets():
         "stockout_rate",
         "ad_roas",
         "ad_ctr",
-        # 天猫
-        "tmall_behavior_count",
-        "tmall_action_user_count",
-        "tmall_buy_user_rate",
-        "tmall_merchant_buy_user_count",
-        # 复购（同一商家买过 ≥2 次）与购买广度（≥2 个不同商家）是**两个指标**，
-        # 曾经被混成一个，这一组断言保证它们不会再被合并回去
-        "tmall_merchant_repeat_buy_user_count",
-        "tmall_merchant_repeat_buy_user_rate",
-        "tmall_user_multi_merchant_buy_flag",
-        "tmall_category_buy_user_count",
-        "tmall_repurchase_sample_count",
-        "tmall_repurchase_positive_rate",
-        "tmall_active_user_count",
     }
     assert CATALOG_DATASET_NAMES == {
-        # 零售
         "orders",
         "customers",
         "products",
@@ -1200,25 +1177,13 @@ def test_catalog_covers_the_agreed_metrics_and_datasets():
         "ad_campaigns",
         "ad_daily_metrics",
         "after_sales",
-        # 天猫：只有 Gold 汇总表
-        "tmall_daily_metrics",
-        "tmall_funnel_metrics",
-        "tmall_merchant_metrics",
-        "tmall_category_metrics",
-        "tmall_user_metrics",
-        "tmall_repurchase_metrics",
     }
 
 
 def test_catalog_never_registers_a_tmall_detail_table():
-    """天猫明细表一张都不能进目录——理由同上。"""
+    """历史数据域不应重新进入当前目录。"""
     for name in CATALOG_DATASET_NAMES:
-        assert name not in {
-            "tmall_users",
-            "tmall_user_events",
-            "tmall_repurchase_samples",
-            "tmall_ingestion_runs",
-        }
+        assert not name.startswith("tmall")
 
 
 def test_orders_dataset_declares_fields_the_metrics_depend_on():
@@ -1359,10 +1324,7 @@ def test_matched_asset_reason_explains_the_hit_in_chinese():
 def test_every_metric_can_be_found_by_its_own_display_name():
     """目录里的每个指标都要能被自己的中文名检索到，否则等于登记了却搜不出来。
 
-    检索**按领域过滤**，所以这里显式传入指标自己的领域。
-    不传的话，「行为记录数」这类不带领域词的中文名会被路由到零售，
-    查不到天猫指标——那不是 bug，而是领域隔离在正常工作：
-    真实用户问天猫问题时一定会带上「天猫 / 点击 / 商家」这类词。
+    检索按当前电商经营数据域过滤，所以这里显式传入指标自己的领域。
     """
     for metric in METRICS:
         hits = search_metrics_in_catalog(
@@ -1375,23 +1337,13 @@ def test_every_metric_can_be_found_by_its_own_display_name():
         )
 
 
-def test_domain_filter_keeps_the_two_catalogs_apart():
-    """同一个问题在两个领域下检索，结果必须完全不相交。
-
-    这是「不允许跨领域」在资产检索这一层的落点：模型看不到另一个领域的表名，
-    也就写不出跨领域的 SQL。
-    """
-    question = "销售额和点击量"
-    retail = {
-        asset["name"] for asset in search_datasets_in_catalog(question, domain="retail")
+def test_domain_filter_exposes_only_the_company_catalog():
+    names = {
+        asset["name"]
+        for asset in search_datasets_in_catalog("销售额和订单", domain="retail")
     }
-    tmall = {
-        asset["name"] for asset in search_datasets_in_catalog(question, domain="tmall")
-    }
-    assert retail and tmall
-    assert not (retail & tmall)
-    assert all(not name.startswith("tmall") for name in retail)
-    assert all(name.startswith("tmall") for name in tmall)
+    assert names
+    assert all(not name.startswith("tmall") for name in names)
 
 
 # ---------------------------- discover_assets 节点 ----------------------------
@@ -2054,16 +2006,8 @@ def test_retry_count_is_still_zero_when_no_repair_was_needed():
 
 
 def test_mock_results_cover_every_data_intent():
-    """登记了模拟数据的意图，必须正好是那几个「有数据」的意图。
-
-    funnel 是随天猫领域一起加的：没有它，funnel 意图在没有数据库的
-    演示环境下只能拿到 EMPTY_RESULT，「漏斗」这类问题会莫名其妙地
-    答成「没有数据」。
-
-    unknown 不在里面——它压根走不到执行阶段；但它仍然会落到 EMPTY_RESULT，
-    见下面的测试。
-    """
-    assert set(MOCK_RESULTS) == {"trend", "ranking", "breakdown", "repurchase", "funnel"}
+    """登记了模拟数据的意图，必须正好是当前电商经营分析的四类意图。"""
+    assert set(MOCK_RESULTS) == {"trend", "ranking", "breakdown", "repurchase"}
 
 
 def test_query_result_shape_matches_the_state_definition():
@@ -2948,16 +2892,20 @@ def test_fallback_never_invents_field_names():
         assert invented not in serialized
 
 
-def test_partial_field_match_still_degrades():
-    """只差一个字段也要降级——「凑合能用」不是这里的原则。"""
+def test_supported_order_count_trend_uses_its_own_chart_rule():
+    """订单数趋势有独立规则，不应被旧的销售额规则误判成表格。"""
     partial = {
-        "columns": ["month", "order_count"],  # 有 month，但缺 sales_amount
+        "columns": ["month", "order_count"],
         "rows": [{"month": "2025-09", "order_count": 100}],
         "row_count": 1,
         "source": "mock",
     }
 
-    assert suggest_chart(intent="trend", query_result=partial)["chart_type"] == "table"
+    suggestion = suggest_chart(intent="trend", query_result=partial)
+
+    assert suggestion["chart_type"] == "line"
+    assert suggestion["x_field"] == "month"
+    assert suggestion["y_field"] == "order_count"
 
 
 def test_chart_suggestions_are_not_shared_between_calls():
@@ -3011,12 +2959,9 @@ def test_chart_types_and_formats_stay_within_the_declared_literals():
     assert allowed_types == {"line", "bar", "table", "none"}
     assert allowed_formats == {"currency", "number", "percent"}
 
-    # 逐领域检查各自规则表里的每一条。两个领域共用同一套 Literal，
-    # 所以天猫规则也不可能引入前端不认识的新类型。
-    for domain in ("retail", "tmall"):
-        for intent, rule in chart_rules_for_domain(domain).items():
-            assert rule.chart_type in allowed_types, f"{domain}/{intent}"
-            assert rule.value_format in allowed_formats, f"{domain}/{intent}"
+    for intent, rule in chart_rules_for_domain("retail").items():
+        assert rule.chart_type in allowed_types, f"retail/{intent}"
+        assert rule.value_format in allowed_formats, f"retail/{intent}"
 
     # 两个降级出口：none 和 table 都不带数值格式，这是刻意的——
     # 它们表达的是「这次没有图」，不该顺手编一个格式上去。
@@ -3027,50 +2972,14 @@ def test_chart_types_and_formats_stay_within_the_declared_literals():
 
 
 def test_chart_rules_cover_every_data_intent_in_its_own_domain():
-    """规则表的覆盖面：每个领域里「有数据的意图」都要能画成图。
-
-    unknown 不在任何规则表里，它会降级成 table——这是正常路径，不是缺陷。
-    零售四条（trend / ranking / breakdown / repurchase），
-    天猫两条（funnel / trend）：商家排行、类目对比刻意不登记，
-    因为那些结果的列名取决于模型怎么起别名，写死一个只会经常失配，
-    落到 table 比猜错列名安全得多。
-    """
-    assert set(MOCK_RESULTS) == {"trend", "ranking", "breakdown", "repurchase", "funnel"}
+    """当前电商经营分析的四类有数据意图都能得到图表规则。"""
+    assert set(MOCK_RESULTS) == {"trend", "ranking", "breakdown", "repurchase"}
     assert set(chart_rules_for_domain("retail")) == {
         "trend",
         "ranking",
         "breakdown",
         "repurchase",
     }
-    assert set(chart_rules_for_domain("tmall")) == {"funnel", "trend"}
-
-    # 天猫的规则必须能在**天猫形状的结果**上真的命中，否则规则写了等于没写
-    # ——它会静默降级成表格，没有任何断言会发现。
-    #
-    # trend 这条要用构造出来的结果验证，不能用 execute_mock_query：
-    # 模拟数据是按 intent 索引的，`trend` 那条是**零售形状**
-    # （month / sales_amount），根本没有天猫形状的那一份。
-    tmall_trend_result: QueryResult = {
-        "columns": ["metric_date", "event_count"],
-        "rows": [{"metric_date": "2014-05-11", "event_count": 1200}],
-        "row_count": 1,
-        "source": "mock",
-    }
-    suggestion = suggest_chart(
-        intent="trend", query_result=tmall_trend_result, domain="tmall"
-    )
-    assert suggestion["chart_type"] == "line"
-    assert suggestion["x_field"] == "metric_date"
-    assert suggestion["y_field"] == "event_count"
-
-    funnel_suggestion = suggest_chart(
-        intent="funnel",
-        query_result=execute_mock_query(sql="SELECT 1 LIMIT 1", intent="funnel"),
-        domain="tmall",
-    )
-    assert funnel_suggestion["chart_type"] == "bar"
-    assert funnel_suggestion["x_field"] == "action_type"
-    assert funnel_suggestion["y_field"] == "user_count"
 
     for intent in chart_rules_for_domain("retail"):
         suggestion = suggest_chart(
@@ -3080,28 +2989,12 @@ def test_chart_rules_cover_every_data_intent_in_its_own_domain():
         assert suggestion["chart_type"] in {"line", "bar"}, intent
 
 
-def test_tmall_chart_rules_do_not_apply_to_retail_results():
-    """同一个意图在不同领域拿到不同的图——这正是分两张规则表的理由。
-
-    funnel 在零售领域没有对应规则，必须降级成 table，
-    绝不能拿天猫的 action_type / user_count 去比对零售结果的列。
-    """
-    funnel_result = execute_mock_query(sql="SELECT 1 LIMIT 1", intent="funnel")
-    assert suggest_chart(intent="funnel", query_result=funnel_result, domain="tmall")[
-        "chart_type"
-    ] == "bar"
-    assert suggest_chart(intent="funnel", query_result=funnel_result, domain="retail")[
-        "chart_type"
-    ] == "table"
-
-    # trend 两个领域都有规则，但字段名不同——用错领域就会降级成表格
+def test_chart_rules_are_deterministic_for_the_company_domain():
+    """相同的电商结果始终使用相同的图表规则。"""
     trend_result = execute_mock_query(sql="SELECT 1 LIMIT 1", intent="trend")
     assert suggest_chart(intent="trend", query_result=trend_result, domain="retail")[
         "chart_type"
     ] == "line"
-    assert suggest_chart(intent="trend", query_result=trend_result, domain="tmall")[
-        "chart_type"
-    ] == "table"
 
 
 # ---------------------------- suggest_visualization 节点 ----------------------------

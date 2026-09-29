@@ -126,93 +126,6 @@ ALLOWED_COLUMNS: dict[str, frozenset[str]] = {
             "request_date_id", "completed_date_id",
         }
     ),
-    # ---- 天猫领域 ----
-    #
-    # **只登记 Gold 层，明细表一张都不在。** 这不是性能考虑（100 万行 PostgreSQL
-    # 扫起来并不慢），而是权限边界：登记了 tmall_user_events，任何 LLM 生成的
-    # SQL 就能把某个用户的完整行为轨迹拉出来。把明细留在白名单之外，
-    # 「模型能不能看到用户级明细」这个问题在**表这一层**就有答案：不能。
-    #
-    # 代价是明细的灵活性没了——想问「某个用户某天的完整路径」答不了。
-    # 这份数据集本来也不支持这种问法（没有 session），所以不算损失。
-    "tmall_daily_metrics": frozenset(
-        {
-            "metric_date",
-            "action_type",
-            "event_count",
-            "user_count",
-            "item_count",
-            "merchant_count",
-            "category_count",
-            "event_share",
-            "user_share",
-        }
-    ),
-    "tmall_merchant_metrics": frozenset(
-        {
-            "merchant_id",
-            "event_count",
-            "user_count",
-            "item_count",
-            "category_count",
-            "click_count",
-            "cart_count",
-            "favorite_count",
-            "buy_count",
-            "buy_user_count",
-            "buy_user_rate",
-            "repeat_buy_user_count",
-            "repeat_buy_user_rate",
-        }
-    ),
-    "tmall_category_metrics": frozenset(
-        {
-            "category_id",
-            "event_count",
-            "user_count",
-            "item_count",
-            "merchant_count",
-            "click_count",
-            "cart_count",
-            "favorite_count",
-            "buy_count",
-            "buy_user_count",
-            "buy_user_rate",
-        }
-    ),
-    "tmall_user_metrics": frozenset(
-        {
-            "user_id",
-            "event_count",
-            "item_count",
-            "merchant_count",
-            "category_count",
-            "active_days",
-            "click_count",
-            "cart_count",
-            "favorite_count",
-            "buy_count",
-            "buy_merchant_count",
-            "multi_merchant_buy_flag",
-            "repeat_buy_flag",
-            "first_event_date",
-            "last_event_date",
-        }
-    ),
-    "tmall_funnel_metrics": frozenset(
-        {"action_type", "step_order", "user_count", "event_count", "user_rate", "event_rate"}
-    ),
-    "tmall_repurchase_metrics": frozenset(
-        {
-            "dataset_split",
-            "label_group",
-            "sample_count",
-            "user_count",
-            "merchant_count",
-            "positive_rate",
-            "average_probability",
-        }
-    ),
 }
 
 # 只允许这几个聚合函数。sqlglot 会把已知函数解析成专门的节点类
@@ -417,10 +330,8 @@ def _validate_domains(tree: exp.Expression, issues: list[str]) -> None:
     """禁止跨领域 JOIN。
 
     为什么单列一条规则，而不是指望「白名单里没有那张表」把问题挡住？
-    因为挡不住：`orders JOIN tmall_user_metrics` 里两张表**都在**白名单内，
-    语法完全合法，查出来的数字却没有任何业务含义——2014 年的行为记录
-    配 2025 年的订单金额，两边的主体、时间、口径都不通用。
-    这类错误的可怕之处是它不报错，只是给出一个看起来正常的错数字。
+    即使未来增加第二个业务域，也不能让两个无关业务域的表被拼在一起。
+    这类错误的可怕之处是 SQL 可能不报错，只是给出一个看起来正常的错数字。
 
     未登记的表不参与判断：它们已经因为「未授权」被拒，再报一条跨领域
     只会让 issues 变长而不增加信息。

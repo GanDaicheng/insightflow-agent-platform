@@ -20,15 +20,11 @@ from typing import Annotated, Literal, TypedDict
 
 # 问题意图。加新意图时改这里一处，类型检查会把所有需要同步处理的地方都指出来。
 #
-# funnel 是天猫领域特有的：它问的是「各行为环节有多少人」，来源是
-# tmall_funnel_metrics。零售数仓没有对应的结构（订单表里没有行为序列），
-# 所以零售问题不会走到这个意图上。
-Intent = Literal["trend", "ranking", "breakdown", "repurchase", "funnel", "unknown"]
+# 当前数据域面向电商公司的经营数据，意图覆盖趋势、排行、拆分和复购分析。
+Intent = Literal["trend", "ranking", "breakdown", "repurchase", "unknown"]
 
-# 数据领域。决定后面允许查哪些表——判错的后果不是「答得不好」，
-# 而是「拿天猫的行为数去解释零售的销售额」，一个不会报错的错误答案。
-# 路由规则见 domain.py。
-Domain = Literal["retail", "tmall"]
+# 数据领域。决定后面允许查哪些表；路由规则见 domain.py。
+Domain = Literal["retail"]
 
 
 class MatchedAsset(TypedDict, total=False):

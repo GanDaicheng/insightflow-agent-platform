@@ -14,4 +14,5 @@ services:
 
   backend:
     environment:
+      APP_MODE: "demo"
       DATABASE_URL: "postgresql+asyncpg://data_platform:data_platform_dev@postgres:5432/data_platform_demo"

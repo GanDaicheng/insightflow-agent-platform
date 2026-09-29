@@ -39,6 +39,17 @@
   text-align: center;
 }
 
+.questionLayout {
+  display: grid;
+  grid-template-columns: var(--kq-grid-columns);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.questionMain {
+  min-width: 0;
+}
+
 /* ------------------------------- 输入区 ------------------------------- */
 
 .hint {
@@ -101,10 +112,15 @@
 /* top_k 选择器 */
 
 .options {
-  margin-top: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
 }
 
 .select {
+  width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -131,6 +147,7 @@
   flex-wrap: wrap;
   gap: var(--space-3);
   margin-top: var(--space-4);
+  justify-content: flex-end;
 }
 
 /* 示例问题 */
@@ -511,6 +528,14 @@
 
 /* 窄屏：相似度的横条换行，不要挤在一行里 */
 @media (max-width: 560px) {
+  .questionLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+
   .exampleGroups {
     grid-template-columns: 1fr;
   }

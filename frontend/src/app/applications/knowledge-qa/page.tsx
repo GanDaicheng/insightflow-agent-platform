@@ -5,6 +5,7 @@ import { ApplicationFlowDiagram } from "@/components/ui/ApplicationFlowDiagram";
 import { getSection, RETAIL_DATA_NOTE } from "@/features/platform/platform-config";
 
 import { KnowledgeQaWorkspace } from "./KnowledgeQaWorkspace";
+import { KNOWLEDGE_QA_EXAMPLES } from "./examples";
 
 const SECTION_ID = "applications";
 
@@ -26,25 +27,6 @@ export const metadata: Metadata = {
  * 点击示例只填入输入框，不自动提交：每次提问都会真实调用 embedding 与模型服务，
  * 不能因为一次误点就花掉两次调用。
  */
-const EXAMPLES = [
-  {
-    label: "指标口径",
-    items: ["客单价怎么算？", "销售额和订单金额有什么区别？", "订单数和商品件数有什么区别？"],
-  },
-  {
-    label: "业务规则",
-    items: ["毛利率是怎么计算的？", "为什么 12 月销售额通常更高？", "促销期订单量和客单价会怎么变化？"],
-  },
-  {
-    label: "数据字典",
-    items: ["订单分析要关联哪些表？", "销售区域字段在什么表里？", "时间分析应该使用哪个日期字段？"],
-  },
-  {
-    label: "经营解释",
-    items: ["华东销售额为什么通常更高？", "区域销售差异应该从哪些指标解释？"],
-  },
-] as const;
-
 /**
  * 知识库问答页面。
  *
@@ -88,7 +70,7 @@ export default function Page() {
 
       <ApplicationFlowDiagram variant="rag" />
 
-      <KnowledgeQaWorkspace examples={EXAMPLES} />
+      <KnowledgeQaWorkspace examples={KNOWLEDGE_QA_EXAMPLES} />
     </article>
   );
 }

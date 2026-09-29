@@ -34,12 +34,7 @@ INTENT_PROMPT = """你是一个意图分类器，只做一件事：判断用户�
 - ranking：按指标大小排序取前几名，例如排行、TOP N、最高、最低
 - breakdown：按区域、商品、会员等级等维度拆分对比
 - repurchase：复购、重复购买、会员回购相关分析
-- funnel：各行为环节分别有多少人，例如点击 / 加购 / 收藏 / 购买的人数与占比、
-  行为漏斗、从点击到购买的行为转化
 - unknown：与数据分析无关的问题（闲聊、写诗、问天气等），或无法判断
-
-funnel 只用于「问各个环节的人数或占比」这类问题。如果问的是行为随时间的
-变化，那是 trend；问的是行为量最多的前 N 个商家或类目，那是 ranking。
 
 reason 用一句简短中文说明判断依据。
 
@@ -58,7 +53,7 @@ class IntentClassification(BaseModel):
     JSON Schema 交给模型，模型只能在这个形状里作答。
     """
 
-    intent: Intent = Field(description="问题意图，只能取约定好的六个值之一")
+    intent: Intent = Field(description="问题意图，只能取约定好的五个值之一")
     reason: str = Field(description="用一句简短中文说明为什么这么分类")
 
 

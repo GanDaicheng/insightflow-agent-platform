@@ -14,7 +14,7 @@ import {
 
 import { QueryResultPanel } from "./QueryResultPanel";
 import { QuestionInput } from "./QuestionInput";
-import type { ExampleGroup } from "./QuestionInput";
+import type { ExampleGroup } from "../../app/applications/data-query/examples";
 import styles from "./data-query.module.css";
 
 /** 一次提问的完整状态。用有限状态而不是几个布尔量，避免出现「既在加载又已出错」。 */

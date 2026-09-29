@@ -5,15 +5,12 @@
 项目里现在有两套完全独立的数据：
 
 - **电商经营数仓**（订单、商品、渠道、促销、履约、库存、广告与售后等表），
-  演示库覆盖 2024—2026 年；基线库仍保留原有小规模样例；
-- **天猫 IJCAI 2015 数据集**（tmall_*），2014 年 5~11 月，只有行为日志，
-  没有价格、订单号、数量、商品名。
+  演示库覆盖 2024—2026 年；基线库仍保留原有小规模样例。
 
-它们的**时间不重叠、主体不重叠、口径也不通用**。把两边的表 JOIN 起来，
-SQL 能跑通、会返回数字，但那个数字没有任何业务含义——它既不是零售的销售额，
-也不是天猫的转化率。更糟的是它看起来完全正常，没有任何报错。
+当前运行时只暴露电商经营数仓。历史数据域仍保留在迁移记录和 `legacy/tmall/` 归档中，
+但不会被默认 Agent、Demo 或初始化脚本加载。
 
-所以「跨领域 JOIN」必须被显式禁止。禁止的落点有两处：
+「跨领域 JOIN」的检查机制仍然保留，方便未来接入第二个业务域时复用。禁止的落点有两处：
 
 - `app/services/safe_query.py`：真正执行 SQL 的那一层（第二道防线）；
 - `app/agent/data_query/sql_validation.py`：校验 LLM 草稿的那一层（第一道防线）。
@@ -34,6 +31,7 @@ from collections.abc import Iterable
 from typing import Final
 
 DOMAIN_RETAIL: Final[str] = "retail"
+# 历史兼容常量：不参与当前运行时注册，仅供旧迁移/归档代码识别字面量。
 DOMAIN_TMALL: Final[str] = "tmall"
 
 # 零售领域：基础事实表与运营扩展表全部登记，具体字段仍由 safe_query 逐列白名单控制。
@@ -44,34 +42,14 @@ RETAIL_TABLES: Final[frozenset[str]] = frozenset(
     }
 )
 
-# 天猫领域的**全部**物理表。包含明细表，因为跨领域检查要能认出
-# `tmall_user_events` 也是天猫的表——哪怕它不在查询白名单里，
-# 有人把它和 orders 写在一起时，报「跨领域」比报「未授权」准确得多。
-TMALL_TABLES: Final[frozenset[str]] = frozenset(
-    {
-        "tmall_ingestion_runs",
-        "tmall_users",
-        "tmall_user_events",
-        "tmall_repurchase_samples",
-        "tmall_daily_metrics",
-        "tmall_merchant_metrics",
-        "tmall_category_metrics",
-        "tmall_user_metrics",
-        "tmall_funnel_metrics",
-        "tmall_repurchase_metrics",
-    }
-)
-
 # 表名 → 领域。没登记的表不在字典里，`domain_of` 返回 None。
 TABLE_DOMAIN: Final[dict[str, str]] = {
     **{name: DOMAIN_RETAIL for name in RETAIL_TABLES},
-    **{name: DOMAIN_TMALL for name in TMALL_TABLES},
 }
 
 # 领域的中文名，用于拼给人看的提示。同样不接收调用方输入。
 DOMAIN_LABELS: Final[dict[str, str]] = {
     DOMAIN_RETAIL: "零售样例数仓",
-    DOMAIN_TMALL: "天猫 IJCAI 2015 数据集",
 }
 
 
@@ -90,9 +68,7 @@ def domains_in(tables: Iterable[str]) -> frozenset[str]:
 def cross_domain_violation(tables: Iterable[str]) -> tuple[str, ...] | None:
     """跨领域时返回涉及的领域名（按固定顺序），没有跨领域则返回 None。
 
-    返回领域名而不是布尔值，是为了让提示能说清楚「你把哪两个领域连起来了」——
-    「禁止跨领域查询」这种话用户看不懂，而
-    「零售样例数仓 与 天猫 IJCAI 2015 数据集 不能连在一起查」能直接指路。
+    返回领域名而不是布尔值，是为了让未来接入多个业务域时提示能说清楚冲突来源。
     """
     domains = domains_in(tables)
     if len(domains) < 2:

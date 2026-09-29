@@ -87,28 +87,15 @@ KNOWLEDGE_KEYWORDS: Final[tuple[str, ...]] = (
     "促销",
     "季节性",
     "区域差异",
-    # 天猫领域词。这些词在知识库里都有专门的说明（数据集限制、漏斗口径、
-    # 复购标签与历史复购的区别），而且**它们背后的限制只有文档写了**——
-    # 不查的话模型会理所当然地算出 GMV 或者讲出一个 session 漏斗。
-    "天猫",
-    "双十一",
-    "加购",
-    "收藏",
-    "行为漏斗",
 )
 
 # 无论问题怎么写，这些意图一律要查知识库。
 #
 # - repurchase：会员复购的业务规则（等级越高复购率越高、复购率怎么算）
 #   整套都写在知识库里，不复述一遍的话模型只能看着一堆比率数字干瞪眼。
-# - funnel：天猫漏斗**不是** session 级的顺序漏斗——数据里没有 session_id，
-#   算不出「点击后加购再购买」的路径。这条限定只写在知识库里，
-#   不查的话模型几乎一定会把它讲成标准的电商转化漏斗，那是一个
-#   听起来非常专业、但完全错误的结论。
-#
 # 反例是 ranking——「销售额最高的 10 个商品是什么」纯粹是取数，
 # 文档里没有也不该有答案，查了只是浪费。
-INTENTS_REQUIRING_KNOWLEDGE: Final[frozenset[str]] = frozenset({"repurchase", "funnel"})
+INTENTS_REQUIRING_KNOWLEDGE: Final[frozenset[str]] = frozenset({"repurchase"})
 
 DEFAULT_KNOWLEDGE_TOP_K: Final[int] = 3
 MIN_KNOWLEDGE_TOP_K: Final[int] = 1

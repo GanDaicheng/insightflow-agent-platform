@@ -4,6 +4,7 @@ import type { ChartSuggestion, QueryResult, ValueFormat } from "@/lib/api/agent-
 import { Notice } from "@/components/ui/Notice";
 
 import { formatAxisValue, formatCategoryLabel, formatValue, toFiniteNumber } from "./format";
+import { getChartFieldLabel } from "./chart-labels";
 import styles from "./data-query.module.css";
 
 const WIDTH = 720;
@@ -17,22 +18,6 @@ type Props = { result: QueryResult; suggestion: ChartSuggestion | null };
 type Point = { label: string; value: number };
 type ChartSeries = { field: string; points: Point[] };
 type ChartMode = "line" | "bar";
-
-const FIELD_LABELS: Record<string, string> = {
-  sales_amount: "销售额",
-  gross_profit: "毛利",
-  order_count: "订单数",
-  ad_spend: "广告花费",
-  refund_amount: "退款金额",
-  gross_margin: "毛利率",
-  refund_rate: "退款率",
-  ad_ctr: "广告点击率",
-  stockout_rate: "缺货率",
-};
-
-function fieldLabel(field: string) {
-  return FIELD_LABELS[field] ?? field;
-}
 
 /** 图表是智能问数的主输出；字段或数值不满足约束时安全降级到明细表。 */
 export function ResultChart({ result, suggestion }: Props) {
@@ -128,7 +113,7 @@ function Legend({ series, format }: { series: ChartSeries[]; format: ValueFormat
       {series.map((item, index) => (
         <span key={item.field} className={styles.legendItem}>
           <span className={styles.legendDot} style={{ backgroundColor: SERIES_COLORS[index % SERIES_COLORS.length] }} />
-          {fieldLabel(item.field)}
+          {getChartFieldLabel(item.field)}
           {item.points.length === 1 ? ` · ${formatValue(item.points[0].value, format)}` : null}
         </span>
       ))}
@@ -168,7 +153,7 @@ function LineChart({ series, format }: { series: ChartSeries[]; format: ValueFor
             <polyline className={styles.linePath} style={{ stroke: SERIES_COLORS[seriesIndex % SERIES_COLORS.length] }} points={item.points.map((point, index) => `${xAt(index)},${yAt(point.value)}`).join(" ")} />
             {item.points.map((point, index) => (
               <circle key={`${item.field}-${index}`} className={styles.linePoint} style={{ fill: SERIES_COLORS[seriesIndex % SERIES_COLORS.length] }} cx={xAt(index)} cy={yAt(point.value)} r={3.5}>
-                <title>{`${fieldLabel(item.field)} · ${point.label}：${formatValue(point.value, format)}`}</title>
+                <title>{`${getChartFieldLabel(item.field)} · ${point.label}：${formatValue(point.value, format)}`}</title>
               </circle>
             ))}
           </g>
@@ -188,8 +173,8 @@ function BarChart({ series, format }: { series: ChartSeries[]; format: ValueForm
     <div>
       <Legend series={series} format={format} />
       {series.map((item, seriesIndex) => (
-        <section key={item.field} className={styles.barSeries} aria-label={`${fieldLabel(item.field)}柱状图`}>
-          {series.length > 1 ? <h3 className={styles.barSeriesTitle}>{fieldLabel(item.field)}</h3> : null}
+        <section key={item.field} className={styles.barSeries} aria-label={`${getChartFieldLabel(item.field)}柱状图`}>
+          {series.length > 1 ? <h3 className={styles.barSeriesTitle}>{getChartFieldLabel(item.field)}</h3> : null}
           <ul className={styles.barList}>
             {item.points.map((point, index) => (
               <li key={`${item.field}-${index}-${point.label}`} className={styles.barRow}>

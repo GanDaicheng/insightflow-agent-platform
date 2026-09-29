@@ -8,8 +8,6 @@ from sqlalchemy import CheckConstraint, ForeignKeyConstraint, Index, UniqueConst
 
 from app.models import Base
 from app.models.retail import MEMBER_LEVELS, Customer, DateDim, Order, Product, Region
-from app.models.tmall import GOLD_TABLES as TMALL_GOLD_TABLES
-from app.models.tmall import SILVER_TABLES as TMALL_SILVER_TABLES
 
 EXPECTED_TABLES = {
     "customers", "products", "regions", "date_dim", "orders", "channels", "promotions",
@@ -20,13 +18,6 @@ EXPECTED_TABLES = {
 # 这里登记一份是为了让「表集合」这条断言保持完整——
 # 任何新表都必须在这里显式登记一次，加表就成了有意识的行为。
 KNOWLEDGE_TABLES = {"knowledge_documents", "knowledge_chunks"}
-
-# 天猫数据集接入阶段新增的表。它由 tests/test_tmall_models.py 专门覆盖，
-# 这里同样只登记一份，理由与上面相同。
-TMALL_TABLES = (
-    {"tmall_ingestion_runs"} | {name for name, _ in TMALL_SILVER_TABLES}
-    | {name for name, _ in TMALL_GOLD_TABLES}
-)
 
 # 任务书要求显式定义的索引，缺一不可。
 # date_dim.full_date 不在这个集合里：它以 UNIQUE 约束的形式声明，
@@ -89,7 +80,7 @@ def _all_columns():
 
 
 def test_metadata_contains_exactly_the_expected_tables():
-    """metadata 里只应有零售 5 张表 + 知识库 2 张表 + 天猫 10 张表。
+    """metadata 里只应有电商经营表 + 知识库表。
 
     这条断言的价值是「新增表必须经过一次有意识的登记」：多出任何一张表都会失败，
     逼着加表的人回来想清楚它属于哪一类。
@@ -97,7 +88,7 @@ def test_metadata_contains_exactly_the_expected_tables():
     原名叫 test_metadata_contains_exactly_the_five_target_tables——RAG 阶段加了
     知识库表之后，名字里的「五张」已经和断言对不上了，所以连同断言一起改掉。
     """
-    assert set(Base.metadata.tables) == EXPECTED_TABLES | KNOWLEDGE_TABLES | TMALL_TABLES
+    assert set(Base.metadata.tables) == EXPECTED_TABLES | KNOWLEDGE_TABLES
 
 
 def test_every_table_has_a_primary_key():

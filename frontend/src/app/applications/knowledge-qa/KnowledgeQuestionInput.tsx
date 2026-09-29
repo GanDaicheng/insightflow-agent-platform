@@ -1,6 +1,6 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/Button";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/rag-answer";
 
 import styles from "./knowledge-qa.module.css";
+import { getKnowledgeQaGridTemplate } from "./knowledge-qa-layout";
 
 type Props = {
   value: string;
@@ -73,70 +74,76 @@ export function KnowledgeQuestionInput({
         用一句中文问业务口径、指标定义、规则说明或数据字典。例如「客单价怎么算」。
       </p>
 
-      <label className={styles.hint} htmlFor="kq-question-input">
-        知识类问题
-      </label>
-      <textarea
-        id="kq-question-input"
-        className={styles.textarea}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={busy}
-        placeholder="例如：客单价怎么算？"
-        aria-describedby="kq-question-meta"
-        // 刻意不设 maxLength：要给用户「超长时看到提示」的机会，
-        // 直接截断会让人以为自己输全了
-      />
+      <div
+        className={styles.questionLayout}
+        style={{ "--kq-grid-columns": getKnowledgeQaGridTemplate() } as CSSProperties}
+      >
+        <div className={styles.questionMain}>
+          <label className={styles.hint} htmlFor="kq-question-input">
+            知识类问题
+          </label>
+          <textarea
+            id="kq-question-input"
+            className={styles.textarea}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={busy}
+            placeholder="例如：客单价怎么算？"
+            aria-describedby="kq-question-meta"
+            // 刻意不设 maxLength：要给用户「超长时看到提示」的机会，
+            // 直接截断会让人以为自己输全了
+          />
 
-      <div className={styles.inputMeta} id="kq-question-meta">
-        <span className={styles.counter} data-over={tooLong}>
-          已输入 {value.length} / {RAG_QUESTION_MAX_LENGTH} 字
-        </span>
-        <span className={styles.hint}>Ctrl / Cmd + Enter 也可以提交</span>
-      </div>
+          <div className={styles.inputMeta} id="kq-question-meta">
+            <span className={styles.counter} data-over={tooLong}>
+              已输入 {value.length} / {RAG_QUESTION_MAX_LENGTH} 字
+            </span>
+            <span className={styles.hint}>Ctrl / Cmd + Enter 也可以提交</span>
+          </div>
 
-      {tooLong ? (
-        <p className={styles.validation} role="alert">
-          问题不能超过 {RAG_QUESTION_MAX_LENGTH} 字，请精简后再提交。
-        </p>
-      ) : null}
+          {tooLong ? (
+            <p className={styles.validation} role="alert">
+              问题不能超过 {RAG_QUESTION_MAX_LENGTH} 字，请精简后再提交。
+            </p>
+          ) : null}
 
-      <div className={styles.options}>
-        <label className={styles.hint} htmlFor="kq-top-k">
-          检索资料条数
-        </label>
-        <select
-          id="kq-top-k"
-          className={styles.select}
-          value={topK}
-          onChange={(event) => onTopKChange(Number(event.target.value))}
-          disabled={busy}
-        >
-          {TOP_K_CHOICES.map((choice) => (
-            <option key={choice} value={choice}>
-              {choice} 条
-              {choice === RAG_DEFAULT_TOP_K ? "（默认）" : ""}
-            </option>
-          ))}
-        </select>
-        <p className={styles.optionNote}>
-          条数越多，作为回答依据的资料越全，但模型要读的内容也越多。
-          资料之间有重复时，加大条数未必更好。
-        </p>
-      </div>
+          <div className={styles.actions}>
+            <Button variant="primary" onClick={onSubmit} disabled={!canSubmit}>
+              {busy ? "检索中…" : "提问"}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={onClear}
+              disabled={busy || (value.length === 0 && trimmed.length === 0)}
+            >
+              清空
+            </Button>
+          </div>
+        </div>
 
-      <div className={styles.actions}>
-        <Button variant="primary" onClick={onSubmit} disabled={!canSubmit}>
-          {busy ? "检索中…" : "提问"}
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={onClear}
-          disabled={busy || (value.length === 0 && trimmed.length === 0)}
-        >
-          清空
-        </Button>
+        <aside className={styles.options} aria-label="检索设置">
+          <label className={styles.hint} htmlFor="kq-top-k">
+            检索资料条数
+          </label>
+          <select
+            id="kq-top-k"
+            className={styles.select}
+            value={topK}
+            onChange={(event) => onTopKChange(Number(event.target.value))}
+            disabled={busy}
+          >
+            {TOP_K_CHOICES.map((choice) => (
+              <option key={choice} value={choice}>
+                {choice} 条
+                {choice === RAG_DEFAULT_TOP_K ? "（默认）" : ""}
+              </option>
+            ))}
+          </select>
+          <p className={styles.optionNote}>
+            条数越多，作为回答依据的资料越全，但模型要读的内容也越多。资料重复时，加大条数未必更好。
+          </p>
+        </aside>
       </div>
 
       <div className={styles.examples}>

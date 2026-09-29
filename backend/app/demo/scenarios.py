@@ -100,61 +100,57 @@ class BusinessAnalysisScenario:
 
 DATA_QUERY_SCENARIOS: tuple[DataQueryScenario, ...] = (
     DataQueryScenario(
-        scenario_id="tmall-trend",
-        question="分析天猫双十一前后的点击和购买趋势。",
-        keywords=("天猫", "趋势"),
+        scenario_id="retail-sales-trend",
+        question="分析公司 2025 年每月销售额和订单数趋势。",
+        keywords=("销售额", "订单数", "趋势"),
         intent="trend",
         sql=(
-            "SELECT tmall_daily_metrics.metric_date, tmall_daily_metrics.action_type,"
-            " SUM(tmall_daily_metrics.event_count) AS total_events"
-            " FROM tmall_daily_metrics"
-            " GROUP BY tmall_daily_metrics.metric_date, tmall_daily_metrics.action_type"
-            " ORDER BY tmall_daily_metrics.metric_date"
+            "SELECT date_dim.month, SUM(orders.net_amount) AS sales_amount,"
+            " COUNT(DISTINCT orders.order_no) AS order_count"
+            " FROM orders JOIN date_dim ON orders.date_id = date_dim.date_id"
+            " GROUP BY date_dim.month ORDER BY date_dim.month"
             " LIMIT 200"
         ),
-        reasoning="使用 tmall_daily_metrics 的日期与行为类型两个维度，按天汇总行为量。",
+        reasoning="按月份汇总订单实付金额和去重订单数，观察企业销售节奏。",
         answer=(
-            "统计周期内点击量始终高于购买量，两者走势同步。"
-            "11 月 11 日前后出现整个周期最明显的峰值，点击与购买同时抬升，"
-            "说明当天是集中的流量与成交高峰；峰值之后两条曲线都快速回落。"
+            "月度销售额与订单数可以同时观察，既能定位销售高峰，也能判断变化来自订单量还是订单金额。"
             "（Demo 模式：以上结论基于内置样例数据，未调用真实模型。）"
         ),
     ),
     DataQueryScenario(
-        scenario_id="tmall-funnel",
-        question="天猫的点击、加购、收藏、购买人数各是多少？",
-        keywords=("加购", "收藏"),
-        intent="funnel",
-        sql=(
-            "SELECT tmall_funnel_metrics.action_type, tmall_funnel_metrics.user_count"
-            " FROM tmall_funnel_metrics"
-            " ORDER BY tmall_funnel_metrics.step_order"
-            " LIMIT 200"
-        ),
-        reasoning="读取 tmall_funnel_metrics，按行为环节顺序列出各环节去重人数。",
-        answer=(
-            "四种行为的参与人数呈明显递减：点击最多，加购次之，收藏再次，购买最少。"
-            "这符合行为漏斗的常见形状——越靠近成交，人数越少。"
-            "（Demo 模式：以上结论基于内置样例数据，未调用真实模型。）"
-        ),
-    ),
-    DataQueryScenario(
-        scenario_id="tmall-merchant-ranking",
-        question="购买用户数最多的天猫商家有哪些？",
-        keywords=("商家", "最多"),
+        scenario_id="retail-product-ranking",
+        question="2025 年销售额最高的 10 个 SKU 是哪些？",
+        keywords=("销售额", "SKU", "最高"),
         intent="ranking",
         sql=(
-            "SELECT tmall_merchant_metrics.merchant_id,"
-            " tmall_merchant_metrics.buy_user_count"
-            " FROM tmall_merchant_metrics"
-            " ORDER BY tmall_merchant_metrics.buy_user_count DESC"
-            " LIMIT 10"
+            "SELECT products.product_id, SUM(orders.net_amount) AS sales_amount"
+            " FROM orders JOIN products ON orders.product_id = products.product_id"
+            " GROUP BY products.product_id ORDER BY sales_amount DESC"
+            " LIMIT 200"
         ),
-        reasoning="读取 tmall_merchant_metrics 的商家购买人数，倒序取前十。",
+        reasoning="按 SKU 汇总实付金额并倒序排列，定位公司的主力商品。",
         answer=(
-            "排行前列的商家购买人数明显高于长尾，头部集中度较高。"
-            "榜单中同时出现少数购买人数特别突出的商家，"
-            "它们贡献了不成比例的成交用户。"
+            "SKU 销售排行适合用柱状图展示，能够快速识别主力商品和长尾商品。"
+            "（Demo 模式：以上结论基于内置样例数据，未调用真实模型。）"
+        ),
+    ),
+    DataQueryScenario(
+        scenario_id="retail-region-margin",
+        question="各省销售额和毛利率有什么差异？",
+        keywords=("省", "毛利率"),
+        intent="breakdown",
+        sql=(
+            "SELECT regions.region_name, SUM(orders.net_amount) AS sales_amount,"
+            " SUM(orders.net_amount - orders.quantity * products.cost_price)"
+            " / SUM(orders.net_amount) AS gross_margin"
+            " FROM orders JOIN regions ON orders.region_id = regions.region_id"
+            " JOIN products ON orders.product_id = products.product_id"
+            " GROUP BY regions.region_name ORDER BY sales_amount DESC"
+            " LIMIT 50"
+        ),
+        reasoning="按省份汇总销售额和毛利率，比较规模与盈利质量。",
+        answer=(
+            "省份销售规模与毛利率需要联合观察，高销售额不一定代表盈利质量最好。"
             "（Demo 模式：以上结论基于内置样例数据，未调用真实模型。）"
         ),
     ),
@@ -163,12 +159,12 @@ DATA_QUERY_SCENARIOS: tuple[DataQueryScenario, ...] = (
 
 KNOWLEDGE_SCENARIOS: tuple[KnowledgeScenario, ...] = (
     KnowledgeScenario(
-        scenario_id="knowledge-repurchase-vs-breadth",
-        question="历史复购、购买广度和训练集标签有什么区别？",
-        keywords=("复购", "购买广度"),
-        source_file="tmall/tmall_metrics.md",
-        section_keyword="购买广度",
-        lead="这三个概念容易混淆，区别在于「看的是谁、数的是什么」：\n\n",
+        scenario_id="knowledge-promotion-boundary",
+        question="促销期间销售额上涨，应该如何判断是不是促销带来的？",
+        keywords=("促销", "销售额"),
+        source_file="retail/promotion_calendar.md",
+        section_keyword="促销活动分析方法",
+        lead="促销归因需要同时看活动窗口、折扣规则和基线趋势：\n\n",
     ),
     KnowledgeScenario(
         scenario_id="knowledge-retail-aov",
@@ -225,7 +221,6 @@ BUSINESS_ANALYSIS_SCENARIOS: tuple[BusinessAnalysisScenario, ...] = (
         ),
     ),
 )
-
 
 # --------------------------------------------------------------------------
 # 匹配

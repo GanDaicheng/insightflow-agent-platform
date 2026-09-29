@@ -92,31 +92,11 @@ _MOCK_REPURCHASE: QueryResult = {
     "source": "mock",
 }
 
-_MOCK_FUNNEL: QueryResult = {
-    # 列名与 tmall_funnel_metrics 的真实字段一致：action_type / user_count / user_rate。
-    # 对齐真实字段名很重要——模拟数据如果用了编造的列名，
-    # 图表规则和 SQL 生成会照着错名字写，等接上真实执行器才暴露。
-    "columns": ["action_type", "step_order", "user_count", "event_count", "user_rate"],
-    "rows": [
-        {"action_type": "click", "step_order": 1, "user_count": 7712, "event_count": 881857,
-         "user_rate": 1.0},
-        {"action_type": "cart", "step_order": 2, "user_count": 812, "event_count": 1343,
-         "user_rate": 0.1053},
-        {"action_type": "favorite", "step_order": 3, "user_count": 4310, "event_count": 55306,
-         "user_rate": 0.5589},
-        {"action_type": "buy", "step_order": 4, "user_count": 4980, "event_count": 60036,
-         "user_rate": 0.6458},
-    ],
-    "row_count": 4,
-    "source": "mock",
-}
-
 MOCK_RESULTS: dict[str, QueryResult] = {
     "trend": _MOCK_TREND,
     "ranking": _MOCK_RANKING,
     "breakdown": _MOCK_BREAKDOWN,
     "repurchase": _MOCK_REPURCHASE,
-    "funnel": _MOCK_FUNNEL,
 }
 
 

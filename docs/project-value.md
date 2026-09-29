@@ -19,7 +19,7 @@ InsightFlow 是面向数据分析师和经营人员的智能经营分析 Agent�
 传统处理方式通常存在四个问题：
 
 1. 用户需要知道表名、字段名和 SQL 写法，业务问题不能直接转成查询。
-2. 不同数据域的指标口径容易混用，例如把天猫行为记录当成订单或销售额。
+2. 销售、毛利、库存、广告和售后指标分散在不同运营表中，口径容易被混用。
 3. 数据查询、图表制作、知识检索、口径核对和报告撰写由人工在多个工具之间切换。
 4. 结果缺少来源和过程，难以判断数字是否真实、口径是否正确。
 
@@ -44,7 +44,7 @@ InsightFlow 是面向数据分析师和经营人员的智能经营分析 Agent�
 | 价值 | 体现方式 | 证据位置 |
 | --- | --- | --- |
 | 降低问数门槛 | 用户用自然语言提问，不必直接编写 SQL | `backend/app/agent/data_query/` |
-| 减少口径误读 | 天猫与零售数据域隔离，知识库提供指标定义和限制 | `backend/app/agent/data_query/catalog.py`、`backend/knowledge_seed/` |
+| 减少口径误读 | 经营指标由受控目录登记，知识库提供定义、规则和限制 | `backend/app/agent/data_query/catalog.py`、`backend/knowledge_seed/` |
 | 缩短分析链路 | 经营分析 Agent 可调用图表查询、知识、指标和报告工具 | `backend/app/agent/business_analysis/` |
 | 提升可追溯性 | 返回结构化结果、知识来源、SSE 过程和持久化报告 | `docs/architecture.md` |
 | 控制 Agent 风险 | AST 校验、字段白名单、只读事务、超时和有限修复 | `backend/app/services/safe_query.py` |

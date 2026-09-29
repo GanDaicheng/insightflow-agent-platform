@@ -450,11 +450,7 @@ def test_load_knowledge_chunks_ignores_non_markdown_files(tmp_path):
 
 
 def test_documents_in_subdirectories_are_picked_up(tmp_path):
-    """知识种子目录按领域分成了 retail/ 和 tmall/ 两个子目录。
-
-    入库脚本只接收一个目录参数，所以扫描必须递归——否则要么给每个领域
-    各跑一次入库（两份配置、迟早漏一个），要么把天猫文档塞进 retail/（分类就错了）。
-    """
+    """知识种子目录允许按业务主题拆分子目录，扫描必须保持递归。"""
     write_doc(tmp_path, "top.md", "# T\n\n## 1. 小节\n\n正文。\n")
     nested = tmp_path / "领域a"
     nested.mkdir()
@@ -522,27 +518,14 @@ def test_real_knowledge_base_has_no_duplicate_file_names():
     assert not duplicates, f"知识库里出现了重名文档：{duplicates}"
 
 
-def test_real_knowledge_base_covers_both_domains():
-    """两个领域的文档都要在扫描范围内，各自的规模也要合理。"""
+def test_real_knowledge_base_covers_retail_knowledge():
+    """当前公开知识库只服务电商经营分析主线。"""
     by_domain: dict[str, int] = {}
     for path in knowledge_document_paths(KNOWLEDGE_SEED_DIR):
         by_domain[path.parent.name] = by_domain.get(path.parent.name, 0) + 1
 
     assert by_domain.get("retail", 0) >= 5
-    assert by_domain.get("tmall", 0) >= 4
-
-
-def test_real_tmall_documents_are_small_enough_for_direct_retrieval():
-    """天猫文档也要保持「一个小节一个切片」，与零售文档同一标准。
-
-    超长小节会被二次切分，切出来的片段失去小节标题的上下文，
-    检索命中率会下降。这条断言是给未来的自己看的。
-    """
-    chunks = load_knowledge_chunks(KNOWLEDGE_SEED_DIR / "tmall")
-
-    assert chunks, "天猫知识文档一个切片都没有"
-    oversized = [chunk for chunk in chunks if chunk.char_count > MAX_SECTION_CHARS]
-    assert not oversized, f"出现超长切片：{[(c.source_file, c.section_title) for c in oversized]}"
+    assert set(by_domain) <= {"retail"}
 
 
 # --------------------------------------------------------------------------

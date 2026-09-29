@@ -25,7 +25,7 @@ from app.agent.data_query.state import (
     QueryResult,
     ValueFormat,
 )
-from app.services.data_domains import DOMAIN_RETAIL, DOMAIN_TMALL
+from app.services.data_domains import DOMAIN_RETAIL
 
 
 class _ChartRule(NamedTuple):
@@ -79,41 +79,6 @@ _CHART_RULES: dict[str, _ChartRule] = {
 }
 
 
-# 天猫领域的图表规则。**图表类型仍然是 line / bar / table，没有新增前端协议。**
-#
-# 为什么天猫要单独一张表，而不是复用上面那张？
-# 因为字段名完全不同：天猫没有 sales_amount / member_level，只有
-# event_count / user_count / action_type / metric_date。
-# 复用会让每一条天猫结果都落到 FALLBACK_CHART（表格）——
-# 不报错，但用户永远看不到图。
-#
-# 只登记两条**字段名可以钉死**的规则：
-# - funnel 的来源是 tmall_funnel_metrics，列名就是 action_type / user_count；
-# - trend  的来源是 tmall_daily_metrics，列名就是 metric_date / event_count。
-# 其余情况（商家排行、类目对比）刻意不登记：那些查询的列名取决于模型怎么起别名
-# （merchant_id 还是 商家id 还是 seller），写死一个只会经常失配。
-# 让它们落到 table 是**诚实**的降级——表格也是受支持的图表类型，
-# 而且不会有「猜错列名导致前端取不到值」的风险。
-_TMALL_CHART_RULES: dict[str, _ChartRule] = {
-    "funnel": _ChartRule(
-        chart_type="bar",
-        title="天猫行为漏斗",
-        x_field="action_type",
-        y_field="user_count",
-        value_format="number",
-        reason="结果包含行为类型与去重用户数，适合使用柱状图比较各环节的人数。",
-    ),
-    "trend": _ChartRule(
-        chart_type="line",
-        title="天猫行为量趋势",
-        x_field="metric_date",
-        y_field="event_count",
-        value_format="number",
-        reason="结果包含日期与行为量，适合使用折线图展示随时间的变化。",
-    ),
-}
-
-
 # 没有数据可画。注意这**不是错误**：查询成功执行了，只是没有匹配的数据，
 # 这是一条有效的业务结论，和「系统出错」完全是两回事。
 EMPTY_CHART: ChartSuggestion = {
@@ -139,10 +104,112 @@ FALLBACK_CHART: ChartSuggestion = {
     "reason": "结果字段不满足当前受控图表规则，建议先以表格查看。",
 }
 
+
+# 电商运营表的查询结果会根据问题使用不同的业务维度别名。
+# 旧规则只覆盖 product_name / region_name，导致 SQL 已经成功但图表安全降级成表格。
+# 这里仍然采用「结果字段完全匹配才绘图」的策略，只是把当前数仓中真实存在的
+# SKU、品类、渠道、广告、库存和履约字段登记进来。
+_RETAIL_ALTERNATIVE_RULES: dict[str, tuple[_ChartRule, ...]] = {
+    "trend": (
+        _ChartRule(
+            chart_type="line",
+            title="订单数趋势",
+            x_field="month",
+            y_field="order_count",
+            value_format="number",
+            reason="结果包含月份和订单数，适合使用折线图观察交易频次变化。",
+        ),
+        _ChartRule(
+            chart_type="line",
+            title="退款金额趋势",
+            x_field="month",
+            y_field="refund_amount",
+            value_format="currency",
+            reason="结果包含月份和退款金额，适合使用折线图观察售后损失变化。",
+        ),
+    ),
+    "ranking": (
+        _ChartRule(
+            chart_type="bar",
+            title="SKU 销售额排行",
+            x_field="product_id",
+            y_field="sales_amount",
+            value_format="currency",
+            reason="结果包含 SKU 和销售额，适合使用柱状图定位主力商品。",
+        ),
+        _ChartRule(
+            chart_type="bar",
+            title="广告活动归因销售额排行",
+            x_field="campaign_name",
+            y_field="attributed_sales_amount",
+            value_format="currency",
+            reason="结果包含广告活动和归因销售额，适合使用柱状图比较投放产出。",
+        ),
+        _ChartRule(
+            chart_type="bar",
+            title="售后原因退款金额排行",
+            x_field="reason",
+            y_field="refund_amount",
+            value_format="currency",
+            reason="结果包含售后原因和退款金额，适合使用柱状图定位售后损失。",
+        ),
+        _ChartRule(
+            chart_type="bar",
+            title="售后原因退款金额排行",
+            x_field="reason",
+            y_field="refund_amount_total",
+            value_format="currency",
+            reason="结果包含售后原因和退款金额，适合使用柱状图定位售后损失。",
+        ),
+    ),
+    "breakdown": (
+        _ChartRule(
+            chart_type="bar",
+            title="品类销售额对比",
+            x_field="category_name",
+            y_field="sales_amount",
+            value_format="currency",
+            reason="结果包含品类和销售额，适合使用柱状图比较商品结构。",
+        ),
+        _ChartRule(
+            chart_type="bar",
+            title="渠道销售额对比",
+            x_field="channel_name",
+            y_field="total_sales_amount",
+            value_format="currency",
+            reason="结果包含销售渠道和销售额，适合使用柱状图比较渠道贡献。",
+        ),
+        _ChartRule(
+            chart_type="bar",
+            title="品类缺货率对比",
+            x_field="category_name",
+            y_field="stockout_rate",
+            value_format="percent",
+            reason="结果包含品类和缺货率，适合使用柱状图定位库存风险。",
+        ),
+        _ChartRule(
+            chart_type="bar",
+            title="省份物流时效对比",
+            x_field="warehouse_province",
+            y_field="avg_delivery_days",
+            value_format="number",
+            reason="结果包含发货仓省份和平均配送天数，适合使用柱状图比较履约体验。",
+        ),
+    ),
+}
+
 # 多指标图表只合并同一展示单位的指标，避免把金额、数量和百分比放在
 # 同一条纵轴上造成误读。顺序也是图例和主指标的稳定顺序。
 _SAME_UNIT_METRICS: dict[str, tuple[str, ...]] = {
-    "currency": ("sales_amount", "gross_profit", "ad_spend", "refund_amount"),
+    "currency": (
+        "sales_amount",
+        "gross_profit",
+        "ad_spend",
+        "refund_amount",
+        "refund_amount_total",
+        "total_sales_amount",
+        "attributed_sales_amount",
+    ),
     "number": ("order_count", "units_sold", "impressions", "clicks"),
     "percent": ("gross_margin", "refund_rate", "ad_ctr", "stockout_rate"),
 }
@@ -157,15 +224,8 @@ def _y_fields_for_result(*, rule: _ChartRule, columns: set[str]) -> list[str]:
     return fields or [rule.y_field]
 
 
-def chart_rules_for_domain(domain: str) -> dict[str, _ChartRule]:
-    """取某个领域的图表规则表（副本，调用方改不动内部状态）。
-
-    未知领域退回零售那张表，而不是返回空表：领域是个新概念，
-    任何还没同步更新的调用方都应该得到「按零售规则试一下」这个行为，
-    而不是突然所有图都变成表格。
-    """
-    if domain == DOMAIN_TMALL:
-        return dict(_TMALL_CHART_RULES)
+def chart_rules_for_domain(domain: str = DOMAIN_RETAIL) -> dict[str, _ChartRule]:
+    """取当前电商经营数据域的图表规则表副本。"""
     return dict(_CHART_RULES)
 
 
@@ -186,8 +246,7 @@ def suggest_chart(
     降级成 table 是承认「这次我们不确定」，这比编一个看起来合理的答案诚实得多，
     也安全得多。
 
-    领域参数**只影响用哪张规则表，不影响图表类型集合**：
-    仍然是 line / bar / table / none，前端协议一个字都没变。
+    领域参数保留在接口中，便于未来扩展多个业务域；当前只使用电商经营数据规则。
 
     返回的 dict 每次都新建一份，不把模块级常量直接交出去：
     调用方拿到后随手改一下，绝不能污染后续所有请求。
@@ -195,12 +254,22 @@ def suggest_chart(
     if (query_result.get("row_count") or 0) <= 0:
         return {**EMPTY_CHART}
 
-    rule = chart_rules_for_domain(domain).get(intent)
-    if rule is None:
-        return {**FALLBACK_CHART}
-
     columns = set(query_result.get("columns") or [])
-    if not {rule.x_field, rule.y_field} <= columns:
+    rule = chart_rules_for_domain(domain).get(intent)
+    if rule is not None and not {rule.x_field, rule.y_field} <= columns:
+        rule = None
+
+    if rule is None and domain == DOMAIN_RETAIL:
+        rule = next(
+            (
+                candidate
+                for candidate in _RETAIL_ALTERNATIVE_RULES.get(intent, ())
+                if {candidate.x_field, candidate.y_field} <= columns
+            ),
+            None,
+        )
+
+    if rule is None:
         return {**FALLBACK_CHART}
 
     return {

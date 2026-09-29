@@ -44,3 +44,11 @@ Thumbs.db
 /build_word_plan.py
 /*.docx
 .worktrees/
+
+# 本地 Agent/编辑器工作区状态：保留在开发机，不进入 GitHub 主目录
+.claude/
+.superpowers/
+.vscode/
+
+# 生成型输出：可复用的架构图统一放在 docs/assets/
+/output/

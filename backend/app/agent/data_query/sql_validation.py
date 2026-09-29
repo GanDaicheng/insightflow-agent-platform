@@ -205,11 +205,8 @@ def validate_sql_draft(
     alias_to_dataset: dict[str, str] = {}
 
     # 先做跨领域检查，再逐表检查授权。
-    # 顺序很重要：`orders JOIN tmall_user_metrics` 里两张表**都在**目录里，
-    # 授权检查会全部放行，SQL 语法也完全合法——它算出来的数字把 2014 年的
-    # 行为记录和 2025 年的订单金额连在一起，没有业务含义，而且不会报任何错。
-    # 只有这条规则能把它拦下来，所以它必须先跑，且报的是「跨领域」而不是
-    # 某个表未授权——后者会把修复方向指到完全错误的地方。
+    # 顺序很重要：如果未来接入多个业务域，授权检查可能同时放行两边的表，
+    # 但跨域查询仍然可能得到没有业务含义的数字，所以要先做领域检查。
     referenced = {table.name.lower() for table in tree.find_all(exp.Table)}
     violation = cross_domain_violation(referenced)
     if violation is not None:
