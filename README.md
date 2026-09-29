@@ -4,6 +4,21 @@
 
 > 项目的重点是面向单个电商公司的 Agent：理解经营问题、选择数据与知识工具、观察证据并生成可追溯的分析结果。仓库提供可重复生成的演示数据，不依赖外部数据集下载。
 
+## 技术栈
+
+| 层次 | 技术 | 在项目中的作用 |
+| --- | --- | --- |
+| Agent 编排 | LangGraph、LangChain | 构建有状态、可校验、可修复的智能问数工作流 |
+| 上层分析 | Deep Agents | 目标拆解、工具选择、多步骤经营分析 |
+| 模型接入 | OpenAI 兼容接口 | 支持 DeepSeek、Qwen、OpenAI 等模型服务 |
+| RAG | text-embedding-v4、qwen3-rerank | 向量化、语义召回和候选精排 |
+| 后端 | FastAPI、Pydantic | API、流式响应、协议校验和服务组装 |
+| 数据访问 | SQLAlchemy 2、asyncpg | 异步数据库访问、事务管理和高性能 COPY |
+| 数据库 | PostgreSQL 16、pgvector | 结构化数据、Agent 状态和向量知识统一存储 |
+| SQL 安全 | sqlglot | SQL AST 解析、表字段白名单和危险语句拦截 |
+| 前端 | Next.js 16、React 19、TypeScript | Agent 工作台、过程展示和结果可视化 |
+| 工程化 | Docker、Alembic、pytest、Vitest、Docker Compose | 迁移、测试和本地部署 |
+
 ## 核心能力
 
 | 能力 | 解决的问题 | 技术实现 |
@@ -129,21 +144,6 @@ Markdown / TXT / DOCX / PDF
 - 使用长期 Store 保存匿名用户的展示偏好和默认分析条件。
 - 对上下文进行裁剪，只保留完成当前任务所需的证据，避免会话无限增长。
 - 每个数字必须来自数据工具，每个规则结论必须附带知识库来源。
-
-## 技术栈
-
-| 层次 | 技术 | 在项目中的作用 |
-| --- | --- | --- |
-| Agent 编排 | LangGraph | 构建有状态、可校验、可修复的智能问数工作流 |
-| 上层分析 | Deep Agents | 目标拆解、工具选择、多步骤经营分析 |
-| 模型接入 | OpenAI 兼容接口 | 支持 DeepSeek、Qwen、OpenAI 等模型服务 |
-| RAG | text-embedding-v4、qwen3-rerank | 向量化、语义召回和候选精排 |
-| 后端 | FastAPI、Pydantic | API、流式响应、协议校验和服务组装 |
-| 数据访问 | SQLAlchemy 2、asyncpg | 异步数据库访问、事务管理和高性能 COPY |
-| 数据库 | PostgreSQL 16、pgvector | 结构化数据、Agent 状态和向量知识统一存储 |
-| SQL 安全 | sqlglot | SQL AST 解析、表字段白名单和危险语句拦截 |
-| 前端 | Next.js 16、React 19、TypeScript | Agent 工作台、过程展示和结果可视化 |
-| 工程化 | Alembic、pytest、Vitest、Docker Compose | 迁移、测试和本地部署 |
 
 ## 工程亮点
 
